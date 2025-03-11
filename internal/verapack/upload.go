@@ -1,8 +1,6 @@
 package verapack
 
 import (
-	"errors"
-	"fmt"
 	"os/exec"
 	"strconv"
 )
@@ -45,11 +43,12 @@ func UploadAndScanApplication(options Options) error {
 	cmd := exec.Command(path, uploadOptionsToArgs(options)...)
 
 	if out, err := cmd.CombinedOutput(); err != nil {
-		return errors.Join(
-			fmt.Errorf("%s: upload error occurred, please see output below", options.AppName),
-			errors.New(string(out)),
-			err,
-		)
+		return NewVeraPackError(string(out), options.AppName, "Scan")
+		// return errors.Join(
+		// 	fmt.Errorf("%s: upload error occurred, please see output below", options.AppName),
+		// 	errors.New(string(out)),
+		// 	err,
+		// )
 	}
 
 	return nil

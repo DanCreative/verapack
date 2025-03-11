@@ -2,7 +2,6 @@ package verapack
 
 import (
 	"errors"
-	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -52,20 +51,22 @@ func PackageApplication(options Options) ([]string, error) {
 
 	out, err := cmd.CombinedOutput()
 	if err != nil {
-		return nil, errors.Join(
-			fmt.Errorf("%s: packaging error occurred, please see output below", options.AppName),
-			errors.New(string(out)),
-			err,
-		)
+		return nil, NewVeraPackError(string(out), options.AppName, "Package")
+		// return errors.Join(
+		// 	fmt.Errorf("%s: packaging error occurred, please see output below", options.AppName),
+		// 	errors.New(string(out)),
+		// 	err,
+		// )
 	}
 
 	artefacts, err := getArtefactPath(options.OutputDir)
 	if err != nil {
-		return nil, errors.Join(
-			fmt.Errorf("%s: packaging error occurred, please see output below", options.AppName),
-			errors.New(string(out)),
-			err,
-		)
+		return nil, NewVeraPackError(string(out), options.AppName, "Package")
+		// return nil, errors.Join(
+		// 	fmt.Errorf("%s: packaging error occurred, please see output below", options.AppName),
+		// 	errors.New(string(out)),
+		// 	err,
+		// )
 	}
 
 	return artefacts, nil
