@@ -1,0 +1,21 @@
+default:
+  # Add any default values that will apply for multiple applications here.
+  verbose: false                        # Increase output verbosity
+  auto_cleanup: true                    # Cleanup any packaged artefacts.
+  trust: true                           # Allow Trusted/Authorized source
+  type: directory                       # Package source type, options=[repo, directory (default)]
+  create_profile: false                 # Create a application profile if the one provided in AppName does not exist
+  # version: 01 Jan 2025 Static         # Name or version of the build that you want to scan. This will be used as the scan name. 
+  # scan_timeout: 60                    # Number of minutes to wait for the scan to complete and pass policy.
+  # scan_polling_interval: 30           # Interval, in seconds, to poll for the status of a running scan. (30 - 120)
+  
+applications:
+  # Add your applications' config here. These values will override the defaults specified above.
+  - app_name: Example                   # Name of the application profile.
+    package_source: C:\\app\\source     # Package source for given source type. If present, auto-packager will be used.
+    # OR: 
+    # artefact_paths:                   # If auto-packaging is not required, you can remove 'package_source' and add the dirs and/or files to be uploaded here.
+    #   - C:\\path\\to\\dir
+    #   - C:\\path\\to\\package.zip 
+  - app_name: Example 2
+    package_source: C:\\app\\source2
