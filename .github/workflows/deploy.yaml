@@ -1,0 +1,26 @@
+name: deploy-bundled-application
+
+on:
+  push:
+    branches: [ "main" ]
+
+jobs:
+
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        arch: ["amd64"]
+        os: ["windows"]
+    env:
+      VERSION: v0.0.0
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.24.0'
+
+    - name: Build
+      run: GOOS=${{ matrix.os }} GOARCH=${{ matrix.arch }} go build -o out\verapack-${{ matrix.os }}-${{ matrix.arch }}-$VERSION\ -ldflags='-s -w -X "main.Version='$VERSION'"'
