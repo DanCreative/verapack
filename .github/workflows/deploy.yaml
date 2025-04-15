@@ -1,0 +1,47 @@
+name: deploy-bundled-application
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+jobs:
+
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        arch: ["amd64"]
+        os: ["windows"]
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.24.0'
+
+    - name: Go Tidy
+      run: go mod tidy && git diff --exit-code
+
+    - name: Go Mod
+      run: go mod download
+
+    - name: Go Mod Verify
+      run: go mod verify
+    
+    - name: Build
+      run: GOOS=${{ matrix.os }} GOARCH=${{ matrix.arch }} go build -o out/verapack-${{ matrix.os }}-${{ matrix.arch }}-${{ github.ref_name }}/ -ldflags='-s -w -X "main.Version='${{ github.ref_name }}'"' ./cmd/verapack/
+
+    - name: Zip build for release
+      run: |
+        sudo apt-get install zip gzip tar
+        (cd out && zip -r ../verapack-${{ matrix.os }}-${{ matrix.arch }}-${{ github.ref_name }}.zip .)
+
+    # Documentation: https://github.com/softprops/action-gh-release
+    - name: Release
+      uses: softprops/action-gh-release@v2
+      with:
+        generate_release_notes: true
+        fail_on_unmatched_files: true
+        files: verapack-${{ matrix.os }}-${{ matrix.arch }}-${{ github.ref_name }}.zip
