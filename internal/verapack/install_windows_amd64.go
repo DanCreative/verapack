@@ -61,7 +61,7 @@ func extractPackagerArchive(source, destination string) error {
 	}
 	defer archive.Close()
 
-	err = os.MkdirAll(destination, os.ModePerm)
+	err = os.MkdirAll(destination, 0600)
 	if err != nil {
 		return err
 	}
