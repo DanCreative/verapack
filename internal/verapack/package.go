@@ -10,7 +10,8 @@ import (
 )
 
 var (
-	errNoArtifacts = errors.New("no artefacts created")
+	errNoArtifacts  = errors.New("no artefacts created")
+	errPackagingErr = errors.New("packaging error")
 )
 
 func packageOptionsToArgs(options Options) []string {
@@ -41,35 +42,27 @@ func packageOptionsToArgs(options Options) []string {
 
 // PackageApplication runs the Veracode auto-packager using the provided PackageOptions,
 // and returns a list of the artefact paths and any errors encountered.
-func PackageApplication(options Options) ([]string, error) {
+func PackageApplication(options Options) ([]string, string, error) {
 	path, err := exec.LookPath("veracode")
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 
 	cmd := exec.Command(path, packageOptionsToArgs(options)...)
 
 	out, err := cmd.CombinedOutput()
 	if err != nil {
-		return nil, NewVeraPackError(string(out), options.AppName, "Package")
-		// return errors.Join(
-		// 	fmt.Errorf("%s: packaging error occurred, please see output below", options.AppName),
-		// 	errors.New(string(out)),
-		// 	err,
-		// )
+		return nil, string(out), errPackagingErr
+		// return nil, NewVeraPackError(string(out), options.AppName, "Package")
 	}
 
 	artefacts, err := getArtefactPath(options.OutputDir)
 	if err != nil {
-		return nil, NewVeraPackError(string(out), options.AppName, "Package")
-		// return nil, errors.Join(
-		// 	fmt.Errorf("%s: packaging error occurred, please see output below", options.AppName),
-		// 	errors.New(string(out)),
-		// 	err,
-		// )
+		return nil, string(out), err
+		// return nil, NewVeraPackError(string(out), options.AppName, "Package")
 	}
 
-	return artefacts, nil
+	return artefacts, string(out), nil
 }
 
 func versionPackager() string {
@@ -111,12 +104,6 @@ func getArtefactPath(dirPath string) ([]string, error) {
 // Creates the path and returns said path
 func createAppPackagingOutputDir(appName string) (string, error) {
 	path := filepath.Join(os.TempDir(), "verapack", appName, strconv.FormatInt(time.Now().Unix(), 10))
-	err := os.MkdirAll(path, os.ModePerm)
+	err := os.MkdirAll(path, 0600)
 	return path, err
-}
-
-func cleanup(options Options) {
-	if options.AutoCleanup {
-		os.RemoveAll(options.OutputDir)
-	}
 }

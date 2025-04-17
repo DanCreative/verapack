@@ -4,7 +4,6 @@ import (
 	"bytes"
 	_ "embed"
 	"io"
-	"log"
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
@@ -22,7 +21,7 @@ var uploaderFileBytes []byte
 // I made the decision to embed the jar instead of downloading the latest version from Maven,
 // because I couldn't see a way of doing it without adding unnecessary complexity.
 func InstallUploader(dirpath string) error {
-	err := os.MkdirAll(dirpath, os.ModePerm)
+	err := os.MkdirAll(dirpath, 0600)
 	if err != nil {
 		return err
 	}
@@ -75,14 +74,14 @@ func partialPackagerInstall(dirPath string) error {
 
 	downloadedPath, err := downloadPackagerArchive(client, baseURL, ext, fileName)
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 
 	defer os.Remove(downloadedPath)
 
 	err = extractPackagerArchive(downloadedPath, dirPath)
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 
 	return nil
@@ -121,7 +120,7 @@ func downloadPackagerArchive(client *http.Client, baseURL *url.URL, extension, f
 
 	defer file.Close()
 
-	resp, err := http.Get(baseURL.JoinPath(fileName).String())
+	resp, err := client.Get(baseURL.JoinPath(fileName).String())
 	if err != nil {
 		return "", err
 	}

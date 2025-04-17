@@ -1,8 +1,13 @@
 package verapack
 
 import (
+	"errors"
 	"os/exec"
 	"strconv"
+)
+
+var (
+	errScanningErr = errors.New("scanning error")
 )
 
 func uploadOptionsToArgs(options Options) []string {
@@ -34,24 +39,20 @@ func uploadOptionsToArgs(options Options) []string {
 	return r
 }
 
-func UploadAndScanApplication(options Options) error {
+func UploadAndScanApplication(options Options) (string, error) {
 	path, err := exec.LookPath("java")
 	if err != nil {
-		return err
+		return err.Error(), err
 	}
 
 	cmd := exec.Command(path, uploadOptionsToArgs(options)...)
 
-	if out, err := cmd.CombinedOutput(); err != nil {
-		return NewVeraPackError(string(out), options.AppName, "Scan")
-		// return errors.Join(
-		// 	fmt.Errorf("%s: upload error occurred, please see output below", options.AppName),
-		// 	errors.New(string(out)),
-		// 	err,
-		// )
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return string(out), errScanningErr
 	}
 
-	return nil
+	return string(out), nil
 }
 
 func versionUploader(uploaderPath string) string {
