@@ -2,9 +2,12 @@ package verapack
 
 import (
 	"fmt"
+	"net/http"
+	"net/http/cookiejar"
 	"os"
 	"path/filepath"
 
+	"github.com/DanCreative/veracode-go/veracode"
 	"github.com/DanCreative/verapack/internal/components/multistagesetup"
 	"github.com/DanCreative/verapack/internal/components/reportcard"
 	tea "github.com/charmbracelet/bubbletea"
@@ -28,6 +31,23 @@ func NewApp() *cli.App {
 				Usage:   "Package and/or Scan all applications in the config file.",
 				Action:  run,
 				Aliases: []string{"r"},
+			},
+			{
+				Name:    "credentials",
+				Aliases: []string{"c"},
+				Usage:   "Options for managing your credentials.",
+				Subcommands: []*cli.Command{
+					{
+						Name:   "refresh",
+						Usage:  "Automatically re-generate your API credentials and update the credential files.",
+						Action: refreshCredentials,
+					},
+					{
+						Name:   "configure",
+						Usage:  "Configure new credentials manually (Used for when existing credentials have expired or for when switching accounts).",
+						Action: configureCredentials,
+					},
+				},
 			},
 		},
 	}
@@ -130,4 +150,54 @@ func VersionPrinter(cCtx *cli.Context) {
 	os.Setenv("PATH", path+";"+getPackagerLocation())
 
 	fmt.Printf("%s version %s\n%s%s", cCtx.App.Name, cCtx.App.Version, versionPackager(), vUploader)
+}
+
+func refreshCredentials(cCtx *cli.Context) error {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		fmt.Print(renderErrors(err))
+		return err
+	}
+
+	key, secret, err := veracode.LoadVeracodeCredentials()
+	if err != nil {
+		fmt.Print(renderErrors(err))
+		return err
+	}
+
+	jar, err := cookiejar.New(&cookiejar.Options{})
+	if err != nil {
+		fmt.Print(renderErrors(err))
+		return err
+	}
+
+	httpClient := &http.Client{
+		Jar: jar,
+	}
+
+	client, err := veracode.NewClient(httpClient, key, secret)
+	if err != nil {
+		fmt.Print(renderErrors(err))
+		return err
+	}
+
+	p := tea.NewProgram(NewCredentialsRefreshModel(client, homeDir))
+	if _, err := p.Run(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func configureCredentials(cCtx *cli.Context) error {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		fmt.Print(renderErrors(err))
+		return err
+	}
+	var apiKey, apiSecret string
+	p := tea.NewProgram(NewCredentialsConfigureModel(NewCredentialsTask(&apiKey, &apiSecret, nil, nil), homeDir))
+	if _, err := p.Run(); err != nil {
+		return err
+	}
+	return nil
 }
