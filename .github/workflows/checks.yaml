@@ -1,0 +1,22 @@
+name: checks
+on: pull_request
+
+jobs:
+    vuln-check:
+        runs-on: ubuntu-latest
+        timeout-minutes: 2
+        steps:
+            - uses: actions/checkout@v4
+
+            - name: Set up Go
+              uses: actions/setup-go@v4
+              with:
+                go-version-file: go.mod
+            
+            - name: Install `govulncheck`
+              run: go install golang.org/x/vuln/cmd/govulncheck@latest
+
+            - name: Run `govulncheck`
+              run: govulncheck
+            
+    
