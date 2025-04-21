@@ -1,4 +1,4 @@
-name: deploy-bundled-application
+name: release-bundled-application
 
 on:
   push:
@@ -6,20 +6,21 @@ on:
       - "v*.*.*"
 
 jobs:
-
-  build:
+  release:
     runs-on: ubuntu-latest
     strategy:
       matrix:
         arch: ["amd64"]
         os: ["windows"]
+    timeout-minutes: 2
+
     steps:
     - uses: actions/checkout@v4
 
     - name: Set up Go
       uses: actions/setup-go@v4
       with:
-        go-version: '1.24.0'
+        go-version-file: go.mod
 
     - name: Go Tidy
       run: go mod tidy && git diff --exit-code
@@ -29,6 +30,18 @@ jobs:
 
     - name: Go Mod Verify
       run: go mod verify
+
+    - name: Set up JDK 17 for x64
+      uses: actions/setup-java@v4
+      with:
+        java-version: '17'
+        distribution: 'temurin'
+
+    - name: Remove default API wrapper jar
+      run: rm internal/verapack/vosp-api-wrappers-java-*.*.*.*.jar
+
+    - name: Download latest API wrapper jar
+      run: mvn dependency:copy -Dartifact="com.veracode.vosp.api.wrappers:vosp-api-wrappers-java:LATEST" -DoutputDirectory="internal/verapack/"
     
     - name: Build
       run: GOOS=${{ matrix.os }} GOARCH=${{ matrix.arch }} go build -o out/verapack-${{ matrix.os }}-${{ matrix.arch }}-${{ github.ref_name }}/ -ldflags='-s -w -X "main.Version='${{ github.ref_name }}'"' ./cmd/verapack/
