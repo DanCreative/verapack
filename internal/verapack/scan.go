@@ -14,7 +14,8 @@ func appsToRows(applications []Options) []reportcard.Row {
 			Tasks: []reportcard.Task{
 				{Status: reportcard.NotStarted},
 				{Status: reportcard.NotStarted},
-				{Status: reportcard.NotStarted, ShouldRunAnyway: true},
+				// Cleanup should show "running" even if scan fails, but not if packaging fails.
+				{Status: reportcard.NotStarted, ShouldRunAnywayFor: map[int]bool{1: true}},
 			},
 		}
 
@@ -23,7 +24,7 @@ func appsToRows(applications []Options) []reportcard.Row {
 			row.Tasks[0].Status = reportcard.Skip
 		}
 
-		if !application.AutoCleanup || application.PackageSource == "" {
+		if !*application.AutoCleanup || application.PackageSource == "" {
 			// If AutoCleanup is false, indicate that cleanup task will be skipped
 			row.Tasks[2].Status = reportcard.Skip
 		}

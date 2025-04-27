@@ -37,8 +37,11 @@ type TaskResultMsg struct {
 }
 
 type Task struct {
-	Status          TaskStatus
-	ShouldRunAnyway bool
+	Status TaskStatus
+	// ShouldRunAnywayFor allows a task to "run" on the reportcard regardless of if a previous task
+	// failed fatally. ShouldRunAnywayFor is a map[int]bool where the keys are task indexes and the
+	// values are bools indicating whether the task should run for said task.
+	ShouldRunAnywayFor map[int]bool
 }
 
 type Row struct {
@@ -435,6 +438,11 @@ func (m *Model) updateAvailableKeys() {
 //
 // If there are no more tasks that can be moved to In Progress, it means that the item is effectively
 // done in which case the method deletes the index from m.activeTasks.
+//
+// handleRemainingTasks has below parameters:
+//   - i int 			(id/index of the item)
+//   - taskIndex int 	(index of the task from which to check onwards)
+//   - isFatal bool 	(bool indicating if the task failed fatally)
 func (m Model) handleRemainingTasks(i int, taskIndex int, isFatal bool) {
 	var s bool
 	for k := taskIndex; k < len(m.rows[i].Tasks); k++ {
@@ -442,7 +450,10 @@ func (m Model) handleRemainingTasks(i int, taskIndex int, isFatal bool) {
 			m.activeTasks[i] = k
 
 			if isFatal {
-				if m.rows[i].Tasks[k].ShouldRunAnyway {
+				if m.rows[i].Tasks[k].ShouldRunAnywayFor[taskIndex] {
+					// If the original task failed fatally, but the current
+					// task is allowed to run anyway, change its status to
+					// InProgress
 					m.rows[i].Tasks[k].Status = InProgress
 					s = true
 				} else {

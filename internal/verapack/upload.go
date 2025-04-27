@@ -25,7 +25,7 @@ func uploadOptionsToArgs(options Options) []string {
 	r = append(r,
 		"-appname", options.AppName,
 		"-version", options.Version,
-		"-createprofile", strconv.FormatBool(options.CreateProfile),
+		"-createprofile", strconv.FormatBool(*options.CreateProfile),
 	)
 
 	// Optional fields
