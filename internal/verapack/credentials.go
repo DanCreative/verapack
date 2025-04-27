@@ -14,6 +14,11 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
+const (
+	credentialFileLegacyFormat = "[default]\nveracode_api_key_id     = %s\nveracode_api_key_secret = %s"
+	credentialFileFormat       = "api:\n  key-id: %s\n  key-secret: %s"
+)
+
 // setLegacyCredentialsFile creates/truncates the credential file: %home%/.veracode/credential
 func setLegacyCredentialsFile(homeDir, apiKey, apiSecret string) error {
 	file, err := os.Create(filepath.Join(homeDir, ".veracode", "credentials"))

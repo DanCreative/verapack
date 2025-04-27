@@ -18,33 +18,33 @@ import (
 func NewApp() *cli.App {
 	return &cli.App{
 		Name:  "verapack",
-		Usage: "Verapack is a utility that automates and simplifies running Veracode SAST scans for multiple applications from your local machine.",
+		Usage: "Verapack is a utility that automates and simplifies running Veracode SAST scans for multiple applications from your local machine",
 		Commands: []*cli.Command{
 			{
 				Name:    "setup",
-				Usage:   "Configure config files and install the Java wrapper and Veracode CLI if they are not already installed.",
+				Usage:   "Configure config files and install the Java wrapper and Veracode CLI if they are not already installed",
 				Action:  setup,
 				Aliases: []string{"s"},
 			},
 			{
-				Name:    "go",
-				Usage:   "Package and/or Scan all applications in the config file.",
-				Action:  run,
+				Name:    "scan",
+				Usage:   "Package and/or Scan all applications in the config file",
+				Action:  scan,
 				Aliases: []string{"r"},
 			},
 			{
 				Name:    "credentials",
 				Aliases: []string{"c"},
-				Usage:   "Options for managing your credentials.",
+				Usage:   "Options for managing your credentials",
 				Subcommands: []*cli.Command{
 					{
 						Name:   "refresh",
-						Usage:  "Automatically re-generate your API credentials and update the credential files.",
+						Usage:  "Automatically re-generate your API credentials and update the credential files",
 						Action: refreshCredentials,
 					},
 					{
 						Name:   "configure",
-						Usage:  "Configure new credentials manually (Used for when existing credentials have expired or for when switching accounts).",
+						Usage:  "Configure new credentials manually (Used for when existing credentials have expired or for when switching accounts)",
 						Action: configureCredentials,
 					},
 				},
@@ -94,7 +94,7 @@ func setup(cCtx *cli.Context) error {
 	return nil
 }
 
-func run(cCtx *cli.Context) error {
+func scan(cCtx *cli.Context) error {
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
 		fmt.Print(renderErrors(err))

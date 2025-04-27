@@ -47,7 +47,7 @@ func packageAndUploadApplication(uploaderPath string, options Options, appId int
 		// Cleanup is only required if packager is run successfully, then it should be run
 		// at the end.
 		defer func() {
-			if options.AutoCleanup {
+			if *options.AutoCleanup {
 				os.RemoveAll(options.OutputDir)
 			}
 

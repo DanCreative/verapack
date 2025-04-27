@@ -17,11 +17,11 @@ var (
 func packageOptionsToArgs(options Options) []string {
 	r := []string{"package"}
 
-	if options.Verbose {
+	if *options.Verbose {
 		r = append(r, "-v")
 	}
 
-	if options.Trust {
+	if *options.Trust {
 		r = append(r, "-a")
 	}
 
@@ -100,7 +100,7 @@ func getArtefactPath(dirPath string) ([]string, error) {
 	return r, nil
 }
 
-// TODO: baseDir is the temp dir + app folder
+// NOTE: baseDir is the temp dir + app folder
 // Creates the path and returns said path
 func createAppPackagingOutputDir(appName string) (string, error) {
 	path := filepath.Join(os.TempDir(), "verapack", appName, strconv.FormatInt(time.Now().Unix(), 10))
