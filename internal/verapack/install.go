@@ -3,11 +3,14 @@ package verapack
 import (
 	"bytes"
 	_ "embed"
+	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 )
@@ -15,12 +18,115 @@ import (
 //go:embed vosp-api-wrappers-java-*.jar
 var uploaderFileBytes []byte
 
-// InstallUploader writes the embedded Veracode API Java wrapper jar to the provided path
-// so that it can be used in a system call.
+// InstallUploader installs the uploader. If Maven is installed, it will use Maven to download the latest jar file.
+// Otherwise, it will write the embedded jar file to the destination folder.
 //
-// I made the decision to embed the jar instead of downloading the latest version from Maven,
-// because I couldn't see a way of doing it without adding unnecessary complexity.
-func InstallUploader(dirpath string) error {
+// InstallUploader takes dirpath and version string arguments. dirpath is the target directory and version sets which
+// version to install. If version is empty, the value will be set to 'LATEST'. If Maven is not installed, then version
+// is ignored.
+func InstallUploader(dirpath string, version string) error {
+	execPath, err := exec.LookPath("mvn")
+	if err != nil {
+		// If maven is not installed, use the embedded backup jar.
+		return installEmbeddedUploader(dirpath)
+	}
+
+	// Otherwise, use Maven to install the jar.
+
+	if version == "" {
+		version = "LATEST"
+	}
+
+	// 1. Download the wrapper to a temp directory.
+	tempDir, tempFilePath, err := downloadTempUploader(execPath, version)
+	if err != nil {
+		return err
+	}
+
+	// Remove the temp dir regardless of outcome.
+	defer os.RemoveAll(tempDir)
+
+	// 2. If wrapper is already installed, create a backup in case of installation failure.
+	_, existingErr := os.Stat(filepath.Join(dirpath, "VeracodeJavaAPI.jar"))
+	if existingErr == nil {
+		err = os.Rename(filepath.Join(dirpath, "VeracodeJavaAPI.jar"), filepath.Join(dirpath, "VeracodeJavaAPI_bup.jar"))
+		if err != nil {
+			return err
+		}
+	}
+
+	// 3. Copy newly installed wrapper in the temp folder to the destination folder.
+	err = copyTempUploader(tempFilePath, dirpath)
+	if err != nil {
+		// If copy fails, restore backup file.
+		if existingErr == nil {
+			err = os.Rename(filepath.Join(dirpath, "VeracodeJavaAPI_bup.jar"), filepath.Join(dirpath, "VeracodeJavaAPI.jar"))
+			if err != nil {
+				return err
+			}
+		}
+		return err
+	}
+
+	// 4. Remove backup file.
+	if existingErr == nil {
+		os.Remove(filepath.Join(dirpath, "VeracodeJavaAPI_bup.jar"))
+	}
+
+	return nil
+}
+
+// downloadTempUploader downloads the latest wrapper to a temp directory and returns the temp dir path and the file path.
+func downloadTempUploader(execPath string, version string) (string, string, error) {
+	tempDir, err := os.MkdirTemp("", "vosp-api-wrapper-java_*")
+	if err != nil {
+		return "", "", err
+	}
+
+	cmd := exec.Command(execPath,
+		"dependency:copy",
+		fmt.Sprintf("-Dartifact=com.veracode.vosp.api.wrappers:vosp-api-wrappers-java:%s", version),
+		fmt.Sprintf("-DoutputDirectory=%s", tempDir),
+	)
+
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return "", "", errors.New(string(out))
+	}
+
+	fileList, err := os.ReadDir(tempDir)
+	if err != nil {
+		return "", "", err
+	}
+
+	return tempDir, filepath.Join(tempDir, fileList[0].Name()), nil
+}
+
+// copyTempUploader copies the downloaded wrapper from the temp directory to the destination directory.
+func copyTempUploader(tempFilePath, dirPath string) error {
+	inFile, err := os.Open(tempFilePath)
+	if err != nil {
+		return err
+	}
+	defer inFile.Close()
+
+	outFile, err := os.Create(filepath.Join(dirPath, "VeracodeJavaAPI.jar"))
+	if err != nil {
+		return err
+	}
+	defer outFile.Close()
+
+	_, err = io.Copy(outFile, inFile)
+	if err != nil {
+		return err
+	}
+
+	inFile.Close()
+
+	return nil
+}
+
+func installEmbeddedUploader(dirpath string) error {
 	err := os.MkdirAll(dirpath, 0600)
 	if err != nil {
 		return err

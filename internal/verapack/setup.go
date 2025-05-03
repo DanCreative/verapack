@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 
 	"github.com/DanCreative/verapack/internal/components/multistagesetup"
@@ -12,6 +13,7 @@ import (
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 )
 
 var _ multistagesetup.TeaTasker = SimpleTask{}
@@ -42,6 +44,72 @@ func (s SimpleTask) View() string {
 func NewSimpleTask(f tea.Cmd) SimpleTask {
 	return SimpleTask{
 		f: f,
+	}
+}
+
+type PrerequisiteTaskResult struct {
+	warnings []string
+}
+
+type PrerequisiteTask struct {
+	f              tea.Cmd
+	result         PrerequisiteTaskResult
+	acknowledgeKey key.Binding
+}
+
+func (s PrerequisiteTask) GetHelp() help.KeyMap {
+	return s
+}
+
+func (s PrerequisiteTask) Init() tea.Cmd {
+	return s.f
+}
+
+func (s PrerequisiteTask) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case tea.KeyMsg:
+		switch {
+		case key.Matches(msg, s.acknowledgeKey):
+			// This case will only be possible if there are warnings.
+			return s, func() tea.Msg { return multistagesetup.NewWarningTaskResult("") }
+		}
+	case PrerequisiteTaskResult:
+		if len(msg.warnings) < 1 {
+			return s, func() tea.Msg { return multistagesetup.NewSuccessfulTaskResult("") }
+		}
+		s.result = msg
+	}
+
+	return s, nil
+}
+
+func (s PrerequisiteTask) View() string {
+	var r string
+
+	symbolStyle := lipgloss.NewStyle().Width(5)
+
+	for _, warning := range s.result.warnings {
+		r += symbolStyle.Foreground(orange).Render("⚠") + warning + "\n"
+	}
+
+	return r
+}
+
+func (s PrerequisiteTask) ShortHelp() []key.Binding {
+	return []key.Binding{s.acknowledgeKey}
+}
+
+func (s PrerequisiteTask) FullHelp() [][]key.Binding {
+	return nil
+}
+
+func NewPrerequisiteTask(f tea.Cmd) PrerequisiteTask {
+	return PrerequisiteTask{
+		f: f,
+		acknowledgeKey: key.NewBinding(
+			key.WithKeys("enter"),
+			key.WithHelp("enter", "acknowledge"),
+		),
 	}
 }
 
@@ -284,7 +352,7 @@ func SetupCredentials(homeDir string) []multistagesetup.SetupTask {
 	}
 }
 
-func InstallDependancyPackager() multistagesetup.SetupTask {
+func InstallDependencyPackager() multistagesetup.SetupTask {
 	return multistagesetup.NewSetupTask("Install Veracode CLI", NewSimpleTask(func() tea.Msg {
 		packagerPath := getPackagerLocation()
 
@@ -302,18 +370,62 @@ func InstallDependancyPackager() multistagesetup.SetupTask {
 	}))
 }
 
-func InstallDependancyWrapper(appDir string) multistagesetup.SetupTask {
+func UpdateDependencyPackager() multistagesetup.SetupTask {
+	return multistagesetup.NewSetupTask("Update Veracode CLI", NewSimpleTask(func() tea.Msg {
+		packagerPath := getPackagerLocation()
+
+		if err := InstallPackager(false, packagerPath); err != nil {
+			return multistagesetup.NewFailedTaskResult("", err)
+		}
+
+		return multistagesetup.NewSuccessfulTaskResult("successfully updated")
+	}))
+}
+
+func InstallDependencyWrapper(appDir string) multistagesetup.SetupTask {
 	return multistagesetup.NewSetupTask("Install Veracode Uploader", NewSimpleTask(func() tea.Msg {
 		var err error
 		if _, err = os.Stat(filepath.Join(appDir, "VeracodeJavaAPI.jar")); err == nil {
 			return multistagesetup.NewSkippedTaskResult("already installed")
 		}
 
-		err = InstallUploader(appDir)
+		err = InstallUploader(appDir, "")
 		if err != nil {
 			return multistagesetup.NewFailedTaskResult("", err)
 		}
 
 		return multistagesetup.NewSuccessfulTaskResult("successfully installed")
 	}))
+}
+
+func UpdateDependencyWrapper(appDir string) multistagesetup.SetupTask {
+	return multistagesetup.NewSetupTask("Update Veracode Uploader", NewSimpleTask(func() tea.Msg {
+		if err := InstallUploader(appDir, ""); err != nil {
+			return multistagesetup.NewFailedTaskResult("", err)
+		}
+
+		return multistagesetup.NewSuccessfulTaskResult("successfully updated")
+	}))
+}
+
+func Prerequisites() multistagesetup.SetupTask {
+	return multistagesetup.NewSetupTask("Check prerequisites", NewPrerequisiteTask(
+		func() tea.Msg {
+			p := PrerequisiteTaskResult{
+				warnings: make([]string, 0, 2),
+			}
+
+			_, err := exec.LookPath("mvn")
+			if err != nil {
+				p.warnings = append(p.warnings, "Maven was not found on the path. It is required in order to install the latest version of the uploader.")
+			}
+
+			_, err = exec.LookPath("java")
+			if err != nil {
+				p.warnings = append(p.warnings, "Java was not found on the path. You can either install Java version 8, 11 or 17.")
+			}
+
+			return p
+		},
+	))
 }

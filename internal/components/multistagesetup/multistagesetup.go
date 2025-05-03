@@ -18,11 +18,12 @@ var (
 )
 
 const (
-	SetupTaskSuccess SetupTaskStatus = iota
-	SetupTaskFailure
-	SetupTaskInProgress
-	SetupTaskTodo
-	SetupTaskSkipped
+	SetupTaskSuccess    SetupTaskStatus = iota // Task was successful (Final Status)
+	SetupTaskFailure                           // Task failed. This will cause all following tasks to skip (Final Status)
+	SetupTaskWarning                           // Task is successful, but with warning(s) (Final Status)
+	SetupTaskInProgress                        // Task is in progress. Shows the view of the task model
+	SetupTaskTodo                              // Task is still to come
+	SetupTaskSkipped                           // Task is not required to be run
 )
 
 // taskResult implements interface tea.Msg and is returned to the tea runtime and by extension setupModel.Update()
@@ -42,6 +43,10 @@ func NewSuccessfulTaskResult(msg string) TaskResult {
 
 func NewSkippedTaskResult(msg string) TaskResult {
 	return TaskResult{Status: SetupTaskSkipped, Msg: msg}
+}
+
+func NewWarningTaskResult(msg string) TaskResult {
+	return TaskResult{Status: SetupTaskWarning, Msg: msg}
 }
 
 // SetupTask wraps the teaTasker and contains any data that the setupModel will use.
@@ -108,6 +113,7 @@ type Styles struct {
 	StatusInProgress lipgloss.Style
 	StatusSkipped    SummaryStyle
 	StatusTodo       SummaryStyle
+	StatusWarning    SummaryStyle
 	StageBlock       lipgloss.Style
 	MsgText          lipgloss.Style
 	FinalMessage     lipgloss.Style
@@ -176,7 +182,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case TaskResult:
 		m.tasks[m.activeTask].msg = msgt.Msg
 		switch msgt.Status {
-		case SetupTaskSuccess, SetupTaskSkipped:
+		case SetupTaskSuccess, SetupTaskWarning, SetupTaskSkipped:
 			m.tasks[m.activeTask].status = msgt.Status
 
 			if m.activeTask+1 < len(m.tasks) {
@@ -269,6 +275,9 @@ func (m Model) View() string {
 			if b := m.tasks[m.activeTask].task.View(); len(b) > 0 {
 				block = m.styles.StageBlock.Width(int(float64(m.termWidth)*blockWidthPercentage)).Render(b) + "\n"
 			}
+
+		case SetupTaskWarning:
+			symbol, summary = m.styles.StatusWarning.render(task.summary)
 
 		case SetupTaskSuccess:
 			symbol, summary = m.styles.StatusSuccess.render(task.summary)
