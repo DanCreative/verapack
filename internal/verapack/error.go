@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"reflect"
 
+	"github.com/DanCreative/veracode-go/veracode"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/go-playground/validator/v10"
 )
@@ -34,6 +35,7 @@ func renderErrors(errs ...error) string {
 
 	for k, err := range errs {
 		var validateErrs validator.ValidationErrors
+		var apiError veracode.Error
 		if errors.As(err, &validateErrs) {
 			for j, e := range validateErrs {
 				var msg string
@@ -77,6 +79,22 @@ func renderErrors(errs ...error) string {
 					r += "\n"
 				}
 			}
+		} else if errors.As(err, &apiError) {
+			var msg string
+			switch apiError.Code {
+			case 401:
+				msg = "an authentication error has occurred, please try manually regenerating your credentials by running: " + lightBlueForeground.Render("verapack credentials configure")
+			case 403:
+				msg = "the user does not have the correct permissions for this action, please contact your administrator to assist"
+			default:
+				msg = err.Error()
+			}
+
+			r += redForeground.Render("✗") + "  " + msg
+			if k != len(errs)-1 {
+				r += "\n"
+			}
+
 		} else {
 			r += redForeground.Render("✗") + "  " + err.Error()
 			if k != len(errs)-1 {

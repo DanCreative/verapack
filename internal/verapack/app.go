@@ -33,6 +33,12 @@ func NewApp() *cli.App {
 				Aliases: []string{"r"},
 			},
 			{
+				Name:    "update",
+				Usage:   "Update all dependencies to the latest versions.",
+				Action:  update,
+				Aliases: []string{"u"},
+			},
+			{
 				Name:    "credentials",
 				Aliases: []string{"c"},
 				Usage:   "Options for managing your credentials",
@@ -62,11 +68,17 @@ func setup(cCtx *cli.Context) error {
 
 	appDir := filepath.Join(homeDir, ".veracode", "verapack")
 
+	var tasks []multistagesetup.SetupTask
+	tasks = append(tasks, Prerequisites())
+	tasks = append(tasks, SetupCredentials(homeDir)...)
+	tasks = append(tasks, SetupConfig(homeDir, appDir), InstallDependencyPackager(), InstallDependencyWrapper(appDir))
+
 	p := tea.NewProgram(multistagesetup.NewModel(
 		multistagesetup.WithSpinner(defaultSpinnerOpts...),
 		multistagesetup.WithStyles(multistagesetup.Styles{
 			StatusFailure:    multistagesetup.SummaryStyle{Symbol: '✗', Colour: red},
 			StatusSuccess:    multistagesetup.SummaryStyle{Symbol: '✓', Colour: green},
+			StatusWarning:    multistagesetup.SummaryStyle{Symbol: '⚠', Colour: orange},
 			StatusSkipped:    multistagesetup.SummaryStyle{Symbol: '✓', Colour: green, Style: lipgloss.NewStyle().Strikethrough(true)},
 			StatusTodo:       multistagesetup.SummaryStyle{Symbol: '!'},
 			StatusInProgress: lipgloss.NewStyle().Foreground(lightBlue),
@@ -79,12 +91,7 @@ func setup(cCtx *cli.Context) error {
 				Border(lipgloss.RoundedBorder()).
 				BorderForeground(lightBlue),
 		}),
-		multistagesetup.WithTasks(append(
-			SetupCredentials(homeDir),
-			SetupConfig(homeDir, appDir),
-			InstallDependancyPackager(),
-			InstallDependancyWrapper(appDir),
-		)...),
+		multistagesetup.WithTasks(tasks...),
 		multistagesetup.WithFinalMessage(fmt.Sprintf("%s\n\n%s", "Initial setup has been successfully completed. To complete the setup, please open below config file and add your applications with their scan settings:", lightBlueForeground.Render(filepath.Join(appDir, "config.yaml")))),
 	))
 	if _, err := p.Run(); err != nil {
@@ -138,20 +145,6 @@ func scan(cCtx *cli.Context) error {
 	return nil
 }
 
-func VersionPrinter(cCtx *cli.Context) {
-	var vUploader string
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		vUploader = "Can't access Uploader"
-	}
-	vUploader = versionUploader(filepath.Join(homeDir, ".veracode", "verapack", "VeracodeJavaAPI.jar"))
-
-	path := os.Getenv("PATH")
-	os.Setenv("PATH", path+";"+getPackagerLocation())
-
-	fmt.Printf("%s version %s\n%s%s", cCtx.App.Name, cCtx.App.Version, versionPackager(), vUploader)
-}
-
 func refreshCredentials(cCtx *cli.Context) error {
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
@@ -200,4 +193,54 @@ func configureCredentials(cCtx *cli.Context) error {
 		return err
 	}
 	return nil
+}
+
+func update(cCtx *cli.Context) error {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		fmt.Print(renderErrors(err))
+		return err
+	}
+
+	appDir := filepath.Join(homeDir, ".veracode", "verapack")
+
+	p := tea.NewProgram(multistagesetup.NewModel(
+		multistagesetup.WithSpinner(defaultSpinnerOpts...),
+		multistagesetup.WithStyles(multistagesetup.Styles{
+			StatusFailure:    multistagesetup.SummaryStyle{Symbol: '✗', Colour: red},
+			StatusSuccess:    multistagesetup.SummaryStyle{Symbol: '✓', Colour: green},
+			StatusWarning:    multistagesetup.SummaryStyle{Symbol: '⚠', Colour: orange},
+			StatusSkipped:    multistagesetup.SummaryStyle{Symbol: '✓', Colour: green, Style: lipgloss.NewStyle().Strikethrough(true)},
+			StatusTodo:       multistagesetup.SummaryStyle{Symbol: '!'},
+			StatusInProgress: lipgloss.NewStyle().Foreground(lightBlue),
+			StageBlock: lipgloss.NewStyle().Padding(0, 1).Margin(0, 0, 0, 2).
+				Border(lipgloss.RoundedBorder()).
+				BorderForeground(darkGray),
+			MsgText: darkGrayForeground,
+		}),
+		multistagesetup.WithTasks(
+			Prerequisites(),
+			UpdateDependencyPackager(),
+			UpdateDependencyWrapper(appDir),
+		),
+	))
+	if _, err := p.Run(); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func VersionPrinter(cCtx *cli.Context) {
+	var vUploader string
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		vUploader = "Can't access Uploader"
+	}
+	vUploader = versionUploader(filepath.Join(homeDir, ".veracode", "verapack", "VeracodeJavaAPI.jar"))
+
+	path := os.Getenv("PATH")
+	os.Setenv("PATH", path+";"+getPackagerLocation())
+
+	fmt.Printf("%s version %s\n%s%s", cCtx.App.Name, cCtx.App.Version, versionPackager(), vUploader)
 }

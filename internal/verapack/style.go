@@ -13,6 +13,7 @@ var (
 	darkGray  = lipgloss.Color("#767676")
 	green     = lipgloss.Color("42")
 	red       = lipgloss.Color("9")
+	orange    = lipgloss.Color("#FFA500")
 
 	redForeground       = lipgloss.NewStyle().Foreground(red)
 	lightBlueForeground = lipgloss.NewStyle().Foreground(lightBlue)
