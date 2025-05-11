@@ -36,6 +36,10 @@ func uploadOptionsToArgs(options Options) []string {
 		r = append(r, "-scanpollinginterval", strconv.Itoa(options.ScanPollingInterval))
 	}
 
+	if options.ScanType == ScanTypeSandbox {
+		r = append(r, "-sandboxid", strconv.Itoa(options.SandboxId))
+	}
+
 	return r
 }
 

@@ -45,8 +45,9 @@ type Task struct {
 }
 
 type Row struct {
-	Name  string
-	Tasks []Task
+	Name         string
+	Tasks        []Task
+	PrefixValues []string
 }
 
 type Column struct {
@@ -87,6 +88,7 @@ type Model struct {
 	KeyMap          KeyMap
 	spinner         spinner.Model
 	taskColumns     []Column // columns contains all of the headers for the tasks. Does not include the "Name" column.
+	prefixColumns   []Column // prefixColumns contains non-task columns that should be rendered to the left of the taskColumns.
 	nameColumnWidth int      // nameColumnWidth contains the width of the name column. The name column is treated specially.
 	rows            []Row
 	output          output
@@ -211,6 +213,18 @@ func WithTasks(cols []Column) Option {
 	}
 }
 
+// WithPrefixColumns sets the report card's prefix columns (headers). Prefix columns are non-task columns and will be rendered
+// to the left of the task columns.
+func WithPrefixColumns(cols []Column) Option {
+	return func(m *Model) {
+		if cols != nil {
+			m.prefixColumns = cols
+		} else {
+			m.prefixColumns = make([]Column, 0)
+		}
+	}
+}
+
 // WithData sets the report card's rows.
 func WithData(rows []Row) Option {
 	return func(m *Model) {
@@ -286,16 +300,16 @@ func NewModel(options ...Option) Model {
 //
 // It panics if this is not the case. Panic will always be caught during testing.
 func (m Model) validateData() {
-	l := len(m.taskColumns)
+	l := len(m.taskColumns) + len(m.prefixColumns)
 
 	for _, row := range m.rows {
-		if l != len(row.Tasks) {
-			panic("number of columns don't match the number of tasks for all apps")
+		if l != len(row.Tasks)+len(row.PrefixValues) {
+			panic("the number of columns doesn't match the number of tasks + the number of other columns for all apps")
 		}
 	}
 }
 
-func (m Model) Init() tea.Cmd { return m.spinner.Tick }
+func (m Model) Init() tea.Cmd { return tea.Batch(m.spinner.Tick, tea.ClearScreen, tea.WindowSize()) }
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
@@ -490,11 +504,22 @@ func (m Model) View() string {
 
 // headerView renders the content for the summary table's headers.
 func (m Model) headerView() string {
-	s := make([]string, 0, len(m.taskColumns)+1)
+	// s is set to the length of name column + task columns + prefixColumns
+	s := make([]string, 0, len(m.taskColumns)+len(m.prefixColumns)+1)
 
+	// render the name column cell
 	style := lipgloss.NewStyle().Width(m.nameColumnWidth).MaxWidth(m.nameColumnWidth).Inline(true)
 	renderedCell := style.Render("Name")
 	s = append(s, m.styles.NameHeader.Render(renderedCell))
+
+	// render the prefix columns
+	for _, col := range m.prefixColumns {
+		style = lipgloss.NewStyle().Width(col.Width).MaxWidth(col.Width).Inline(true)
+		renderedCell = style.Render(col.Name)
+		s = append(s, m.styles.TaskHeaders.Render(renderedCell))
+	}
+
+	// render the task columns
 	for _, col := range m.taskColumns {
 		style = lipgloss.NewStyle().Width(col.Width).MaxWidth(col.Width).Inline(true)
 		renderedCell = style.Render(col.Name)
@@ -506,7 +531,7 @@ func (m Model) headerView() string {
 
 // renderRow renders the content for a row with index i.
 func (m Model) renderRow(i int) string {
-	s := make([]string, 0, len(m.taskColumns)+1)
+	s := make([]string, 0, len(m.taskColumns)+len(m.prefixColumns)+1)
 
 	style := lipgloss.NewStyle().Width(m.nameColumnWidth).MaxWidth(m.nameColumnWidth).Inline(true)
 	renderedCell := style.Render(m.rows[i].Name)
@@ -518,16 +543,31 @@ func (m Model) renderRow(i int) string {
 		s = append(s, m.styles.Cell.Render(renderedCell))
 	}
 
+	for k, col := range m.prefixColumns {
+		style = lipgloss.NewStyle().Width(col.Width).MaxWidth(col.Width).Inline(true).Align(lipgloss.Left)
+		s = append(s, m.renderPrefixColumn(m.rows[i].PrefixValues[k], style, i))
+	}
+
 	for k, col := range m.taskColumns {
 		style = lipgloss.NewStyle().Width(col.Width).MaxWidth(col.Width).Inline(true).Align(lipgloss.Center)
-		s = append(s, m.renderColumn(m.rows[i].Tasks[k].Status, style, i, k))
+		s = append(s, m.renderTaskColumn(m.rows[i].Tasks[k].Status, style, i, k))
 	}
 
 	return lipgloss.JoinHorizontal(lipgloss.Top, s...)
 }
 
+func (m Model) renderPrefixColumn(value string, style lipgloss.Style, index int) string {
+	renderedCell := style.Render(value)
+
+	if _, row, _ := m.selector.GetSelected(); m.showOutput && row == index {
+		return m.styles.Cell.Inherit(m.styles.Selected).Render(renderedCell)
+	}
+
+	return m.styles.Cell.Render(renderedCell)
+}
+
 // renderColumn aligns and colors the status symbols for the task columns.
-func (m Model) renderColumn(status TaskStatus, style lipgloss.Style, index, taskIndex int) string {
+func (m Model) renderTaskColumn(status TaskStatus, style lipgloss.Style, index, taskIndex int) string {
 	var r, renderedCell string
 
 	switch status {

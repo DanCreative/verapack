@@ -31,6 +31,22 @@ func NewVeraPackError(message, application, task string) *VeraPackError {
 }
 
 func renderErrors(errs ...error) string {
+	return lipgloss.NewStyle().
+		PaddingLeft(1).
+		PaddingRight(1).
+		PaddingBottom(1).
+		MarginLeft(2).
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(darkGray).
+		Render(
+			lipgloss.NewStyle().
+				Padding(0, 0, 1, 0).
+				AlignHorizontal(lipgloss.Center).
+				Underline(true).Render("Errors")+"\n"+rawRenderErrors(errs...),
+		) + "\n"
+}
+
+func rawRenderErrors(errs ...error) string {
 	var r string
 
 	for k, err := range errs {
@@ -103,11 +119,5 @@ func renderErrors(errs ...error) string {
 		}
 	}
 
-	return lipgloss.NewStyle().
-		PaddingLeft(1).
-		PaddingRight(1).
-		PaddingBottom(1).
-		MarginLeft(2).
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(darkGray).Render(headerStyle.Render("Errors")+"\n"+r) + "\n"
+	return r
 }
