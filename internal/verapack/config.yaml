@@ -1,13 +1,14 @@
 default:
   # Add any default values that will apply for multiple applications here.
-  verbose: false                        # Increase output verbosity
-  auto_cleanup: true                    # Cleanup any packaged artefacts.
-  trust: true                           # Allow Trusted/Authorized source
-  type: directory                       # Package source type, options=[repo, directory (default)]
-  create_profile: false                 # Create a application profile if the one provided in AppName does not exist
-  # version: 01 Jan 2025 Static         # Name or version of the build that you want to scan. This will be used as the scan name. 
-  # scan_timeout: 60                    # Number of minutes to wait for the scan to complete and pass policy.
-  # scan_polling_interval: 30           # Interval, in seconds, to poll for the status of a running scan. (30 - 120)
+  verbose: false                          # Increase output verbosity.
+  auto_cleanup: true                      # Automatically remove any packaged artefacts after scanning completes.
+  trust: true                             # Allow Trusted/Authorized source.
+  type: directory                         # Package source type, options=[repo, directory (default)].
+  create_profile: false                   # Create a application profile if the one provided in AppName does not exist.
+  sandbox_name: Release Candidate         # Name of the sandbox to use when running a sandbox scan or promoting a sandbox scan.
+  # version: 02 Jan 2006 15:04PM Static   # Name or version of the build that you want to scan. This will be used as the scan name. If omitted, the current date time will be used.
+  # scan_timeout: 60                      # Number of minutes to wait for the scan to complete and pass policy.
+  # scan_polling_interval: 30             # Interval, in seconds, to poll for the status of a running scan. (30 - 120)
   
 applications:
   # Add your applications' config here. These values will override the defaults specified above.

@@ -11,10 +11,15 @@ import (
 )
 
 type SourceType string
+type ScanType string
 
 const (
 	Repo      SourceType = "repo"
 	Directory SourceType = "directory"
+
+	ScanTypeSandbox ScanType = "sandbox"
+	ScanTypePolicy  ScanType = "policy"
+	ScanTypePromote ScanType = "promote"
 )
 
 var validate *validator.Validate
@@ -34,6 +39,12 @@ type Options struct {
 	ArtefactPaths []string `yaml:"artefact_paths" validate:"required_without=PackageSource,omitempty,dive,file|dir"`
 	// Name or version of the build that you want to scan.
 	Version string `yaml:"version" validate:"required"`
+
+	SandboxName string `yaml:"sandbox_name"` // Name of the sandbox in which to run the scan. This is what the user will provide in the yaml file.
+	SandboxId   int    `yaml:"-"`            // ID of the sandbox in which to run the scan. Application will determine the sandbox id from the provided sandbox name.
+	SandboxGuid string `yaml:"-"`            // GUID of the sandbox in which to run the scan.
+	AppGuid     string `yaml:"-"`            // GUID of the application profile.
+
 	// Number of minutes to wait for the scan to complete and pass policy.
 	// If the scan does not complete or fails policy, the build fails.
 	//
@@ -54,6 +65,7 @@ type Options struct {
 	Type          SourceType `yaml:"type" validate:"oneof=directory repo"`
 
 	// Other options:
+	ScanType ScanType `yaml:"-"` // The type of scan to run. Can be either policy or sandbox at this stage.
 }
 
 type Config struct {
