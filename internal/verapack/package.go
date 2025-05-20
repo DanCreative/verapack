@@ -1,12 +1,16 @@
 package verapack
 
 import (
+	"bytes"
 	"errors"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strconv"
 	"time"
+
+	"github.com/charmbracelet/bubbles/runeutil"
 )
 
 var (
@@ -42,7 +46,9 @@ func packageOptionsToArgs(options Options) []string {
 
 // PackageApplication runs the Veracode auto-packager using the provided PackageOptions,
 // and returns a list of the artefact paths and any errors encountered.
-func PackageApplication(options Options) ([]string, string, error) {
+//
+// writer can optionally be provided to write log output to an additional location.
+func PackageApplication(options Options, writer io.Writer) ([]string, string, error) {
 	path, err := exec.LookPath("veracode")
 	if err != nil {
 		return nil, "", err
@@ -50,19 +56,30 @@ func PackageApplication(options Options) ([]string, string, error) {
 
 	cmd := exec.Command(path, packageOptionsToArgs(options)...)
 
-	out, err := cmd.CombinedOutput()
+	var outBuffer bytes.Buffer
+
+	if writer != nil {
+		cmd.Stderr = io.MultiWriter(&outBuffer, writer)
+		cmd.Stdout = io.MultiWriter(&outBuffer, writer)
+	} else {
+		cmd.Stderr, cmd.Stdout = &outBuffer, &outBuffer
+	}
+
+	err = cmd.Run()
+
+	sanitizer := runeutil.NewSanitizer()
+	out := string(sanitizer.Sanitize([]rune(outBuffer.String())))
+
 	if err != nil {
-		return nil, string(out), errPackagingErr
-		// return nil, NewVeraPackError(string(out), options.AppName, "Package")
+		return nil, err.Error() + "\n" + out, errPackagingErr
 	}
 
 	artefacts, err := getArtefactPath(options.OutputDir)
 	if err != nil {
-		return nil, string(out), err
-		// return nil, NewVeraPackError(string(out), options.AppName, "Package")
+		return nil, err.Error() + "\n" + out, err
 	}
 
-	return artefacts, string(out), nil
+	return artefacts, out, nil
 }
 
 func versionPackager() string {

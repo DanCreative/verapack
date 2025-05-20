@@ -284,7 +284,6 @@ func sandbox(cCtx *cli.Context) error {
 
 	if s, ok := m.(sand.Model); ok {
 		if errs := s.GetErrors(); len(errs) > 0 {
-			fmt.Print(renderErrors(errs...))
 			return err
 		}
 	}
@@ -516,7 +515,6 @@ func promote(cCtx *cli.Context) error {
 
 	if s, ok := m.(sand.Model); ok {
 		if errs := s.GetErrors(); len(errs) > 0 {
-			fmt.Print(renderErrors(errs...))
 			return err
 		}
 	}
