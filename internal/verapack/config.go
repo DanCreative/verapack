@@ -61,7 +61,8 @@ type Options struct {
 	AutoCleanup   *bool      `yaml:"auto_cleanup"`
 	OutputDir     string     `yaml:"-"`
 	PackageSource string     `yaml:"package_source" validate:"required_without=ArtefactPaths,omitempty,url|dir"`
-	Trust         *bool      `yaml:"trust"`
+	Trust         *bool      `yaml:"-"`
+	Strict        bool       `yaml:"strict"`
 	Type          SourceType `yaml:"type" validate:"oneof=directory repo"`
 
 	// Other options:
@@ -76,12 +77,16 @@ type Config struct {
 // NewConfig returns a new Config and sets all pointer values to avoid nil pointer errors downstream.
 func NewConfig() Config {
 	var b bool
+	a := true
 	return Config{
 		Default: Options{
 			CreateProfile: &b,
 			Verbose:       &b,
 			AutoCleanup:   &b,
-			Trust:         &b,
+
+			// Setting trust to true because when it is false, it requires user input and that is not
+			// supporter/required by this application.
+			Trust: &a,
 		},
 	}
 }
