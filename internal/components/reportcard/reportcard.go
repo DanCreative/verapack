@@ -1,12 +1,12 @@
 package reportcard
 
 import (
+	"fmt"
 	"math"
 
 	"github.com/charmbracelet/bubbles/help"
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/spinner"
-	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 )
@@ -319,6 +319,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		// get the width of the terminal
 		m.termWidth = msg.Width
+
+		m.output.viewport.setWrappedLines(int(float64(m.termWidth) * 0.6))
+
 	case tea.KeyMsg:
 		switch {
 		case key.Matches(msg, m.KeyMap.Quit):
@@ -330,61 +333,65 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case key.Matches(msg, m.KeyMap.ColLeft):
 			// If there is output to show, move left on the table.
 			item, _, _ := m.selector.MoveCursor(left)
-			m.output.SetContent(item.Output)
+			m.output.SetContent(item.Output, int(float64(m.termWidth)*0.6))
 
 		case key.Matches(msg, m.KeyMap.ColRight):
 			// If there is output to show, move right on the table.
 			item, _, _ := m.selector.MoveCursor(right)
-			m.output.SetContent(item.Output)
+			m.output.SetContent(item.Output, int(float64(m.termWidth)*0.6))
 
 		case key.Matches(msg, m.KeyMap.LineDown):
 			// If there is output to show, move down on the table.
 			item, _, _ := m.selector.MoveCursor(down)
-			m.output.SetContent(item.Output)
+			m.output.SetContent(item.Output, int(float64(m.termWidth)*0.6))
 
 		case key.Matches(msg, m.KeyMap.LineUp):
 			// If there is output to show, move down on the table.
 			item, _, _ := m.selector.MoveCursor(up)
-			m.output.SetContent(item.Output)
+			m.output.SetContent(item.Output, int(float64(m.termWidth)*0.6))
 
 		case key.Matches(msg, m.KeyMap.ShowOutput):
 			// If there is output to show, show/hide the output.
 			m.showOutput = !m.showOutput
 
+			if m.showOutput {
+				m.output.viewport.setWrappedLines(int(float64(m.termWidth) * 0.6))
+			}
+
 		case key.Matches(msg, m.KeyMap.PageDown):
 			lines := m.output.viewport.ViewDown()
 			if m.output.viewport.HighPerformanceRendering {
-				cmds = append(cmds, viewport.ViewDown(m.output.viewport, lines))
+				cmds = append(cmds, ViewDown(m.output.viewport, lines))
 			}
 
 		case key.Matches(msg, m.KeyMap.PageUp):
 			lines := m.output.viewport.ViewUp()
 			if m.output.viewport.HighPerformanceRendering {
-				cmds = append(cmds, viewport.ViewUp(m.output.viewport, lines))
+				cmds = append(cmds, ViewUp(m.output.viewport, lines))
 			}
 
 		case key.Matches(msg, m.KeyMap.HalfPageDown):
 			lines := m.output.viewport.HalfViewDown()
 			if m.output.viewport.HighPerformanceRendering {
-				cmds = append(cmds, viewport.ViewDown(m.output.viewport, lines))
+				cmds = append(cmds, ViewDown(m.output.viewport, lines))
 			}
 
 		case key.Matches(msg, m.KeyMap.HalfPageUp):
 			lines := m.output.viewport.HalfViewUp()
 			if m.output.viewport.HighPerformanceRendering {
-				cmds = append(cmds, viewport.ViewUp(m.output.viewport, lines))
+				cmds = append(cmds, ViewUp(m.output.viewport, lines))
 			}
 
 		case key.Matches(msg, m.KeyMap.Down):
 			lines := m.output.viewport.LineDown(1)
 			if m.output.viewport.HighPerformanceRendering {
-				cmds = append(cmds, viewport.ViewDown(m.output.viewport, lines))
+				cmds = append(cmds, ViewDown(m.output.viewport, lines))
 			}
 
 		case key.Matches(msg, m.KeyMap.Up):
 			lines := m.output.viewport.LineUp(1)
 			if m.output.viewport.HighPerformanceRendering {
-				cmds = append(cmds, viewport.ViewUp(m.output.viewport, lines))
+				cmds = append(cmds, ViewUp(m.output.viewport, lines))
 			}
 		}
 	case TaskResultMsg:
@@ -395,7 +402,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if !m.notFirstCompletedTask {
 				// for that first task that completes, enable keys and set the output content.
 				m.setCanShowOutput()
-				m.output.SetContent(msg.Output)
+				m.output.SetContent(msg.Output, int(float64(m.termWidth)*0.6))
 				m.notFirstCompletedTask = true
 			}
 			msg.taskIndex = taskIndex
@@ -497,7 +504,7 @@ func (m Model) View() string {
 
 	var output string
 	if m.showOutput {
-		output = m.styles.Border.Render(lipgloss.NewStyle().Bold(true).Render("Output") + "\n" + m.output.View())
+		output = m.styles.Border.Render(fmt.Sprintf("%s\n\n", lipgloss.NewStyle().Bold(true).Render("Output")) + m.output.View())
 	}
 	return lipgloss.JoinVertical(lipgloss.Left, summary, output) + "\n" + m.Help.View(m.KeyMap)
 }

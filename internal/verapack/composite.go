@@ -17,6 +17,8 @@ type reporter interface {
 //
 // UploadAndScanApplication requires ArtefactPaths to be set. Either it or PackageSource needs
 // to be set in the config. If PackageSource is set, PackageApplication will be run and set it.
+//
+// TODO: Implement log output
 func packageAndUploadApplication(uploaderPath string, options Options, appId int, reporter reporter) error {
 	var err error
 	if options.PackageSource != "" {
@@ -32,7 +34,7 @@ func packageAndUploadApplication(uploaderPath string, options Options, appId int
 			return err
 		}
 
-		artefactPaths, out, err := PackageApplication(options)
+		artefactPaths, out, err := PackageApplication(options, nil)
 		if err != nil {
 
 			reporter.Send(reportcard.TaskResultMsg{
@@ -68,7 +70,7 @@ func packageAndUploadApplication(uploaderPath string, options Options, appId int
 
 	options.UploaderFilePath = uploaderPath
 
-	out, err := UploadAndScanApplication(options)
+	out, err := UploadAndScanApplication(options, nil)
 	if err != nil {
 		reporter.Send(reportcard.TaskResultMsg{
 			Status:  reportcard.Failure,

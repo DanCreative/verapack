@@ -1,9 +1,13 @@
 package verapack
 
 import (
+	"bytes"
 	"errors"
+	"io"
 	"os/exec"
 	"strconv"
+
+	"github.com/charmbracelet/bubbles/runeutil"
 )
 
 var (
@@ -43,7 +47,7 @@ func uploadOptionsToArgs(options Options) []string {
 	return r
 }
 
-func UploadAndScanApplication(options Options) (string, error) {
+func UploadAndScanApplication(options Options, writer io.Writer) (string, error) {
 	path, err := exec.LookPath("java")
 	if err != nil {
 		return err.Error(), err
@@ -51,12 +55,25 @@ func UploadAndScanApplication(options Options) (string, error) {
 
 	cmd := exec.Command(path, uploadOptionsToArgs(options)...)
 
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		return string(out), errScanningErr
+	var outBuffer bytes.Buffer
+
+	if writer != nil {
+		cmd.Stderr = io.MultiWriter(&outBuffer, writer)
+		cmd.Stdout = io.MultiWriter(&outBuffer, writer)
+	} else {
+		cmd.Stderr, cmd.Stdout = &outBuffer, &outBuffer
 	}
 
-	return string(out), nil
+	err = cmd.Run()
+
+	sanitizer := runeutil.NewSanitizer()
+	out := string(sanitizer.Sanitize([]rune(outBuffer.String())))
+
+	if err != nil {
+		return err.Error() + "\n" + out, errScanningErr
+	}
+
+	return out, nil
 }
 
 func versionUploader(uploaderPath string) string {

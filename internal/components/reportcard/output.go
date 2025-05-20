@@ -1,17 +1,18 @@
 package reportcard
 
 import (
-	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 )
 
 type output struct {
 	ready    bool
-	viewport viewport.Model
+	viewport Viewport
 }
 
-func (m *output) SetContent(s string) {
+func (m *output) SetContent(s string, width int) {
 	m.viewport.SetContent(s)
+	m.viewport.YOffset = 0
+	m.viewport.setWrappedLines(width)
 }
 
 func (m output) Init() tea.Cmd {
@@ -30,9 +31,9 @@ func (m output) Update(msg tea.Msg) (output, tea.Cmd) {
 
 	case tea.WindowSizeMsg:
 		if !m.ready {
-			m.viewport = viewport.New(int(float64(msgt.Width)*0.6), int(float64(msgt.Height)*0.3))
-			m.viewport.YPosition = 1
-			m.viewport.SetContent("")
+			m.viewport = New(int(float64(msgt.Width)*0.6), int(float64(msgt.Height)*0.3))
+			m.viewport.YPosition = 0
+			// m.viewport.SetContent("")
 			m.ready = true
 		} else {
 			m.viewport.Width = int(float64(msgt.Width) * 0.6)
