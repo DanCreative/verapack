@@ -29,6 +29,10 @@ func packageOptionsToArgs(options Options) []string {
 		r = append(r, "-a")
 	}
 
+	if options.Strict {
+		r = append(r, "--strict")
+	}
+
 	if options.Type != "" {
 		r = append(r, "-t", string(options.Type))
 	}
