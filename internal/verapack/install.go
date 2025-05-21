@@ -1,9 +1,7 @@
 package verapack
 
 import (
-	"bytes"
-	_ "embed"
-	"errors"
+	"encoding/xml"
 	"fmt"
 	"io"
 	"net/http"
@@ -15,141 +13,119 @@ import (
 	"strings"
 )
 
-//go:embed vosp-api-wrappers-java-*.jar
-var uploaderFileBytes []byte
-
-// InstallUploader installs the uploader. If Maven is installed, it will use Maven to download the latest jar file.
-// Otherwise, it will write the embedded jar file to the destination folder.
+// InstallUploader installs the uploader jar file to the latest version.
 //
-// InstallUploader takes dirpath and version string arguments. dirpath is the target directory and version sets which
-// version to install. If version is empty, the value will be set to 'LATEST'. If Maven is not installed, then version
-// is ignored.
-func InstallUploader(dirpath string, version string) error {
-	execPath, err := exec.LookPath("mvn")
+// It automatically updates the existing install to the latest version.
+func InstallUploader(dirPath string) (string, error) {
+	jar, _ := cookiejar.New(&cookiejar.Options{})
+	client := &http.Client{
+		Jar: jar,
+	}
+
+	version, err := GetLatestUploaderVersion(client)
 	if err != nil {
-		// If maven is not installed, use the embedded backup jar.
-		return installEmbeddedUploader(dirpath)
+		return "", err
 	}
 
-	// Otherwise, use Maven to install the jar.
-
-	if version == "" {
-		version = "LATEST"
-	}
-
-	// 1. Download the wrapper to a temp directory.
-	tempDir, tempFilePath, err := downloadTempUploader(execPath, version)
+	downloadPath, err := downloadUploaderArchive(client, version)
 	if err != nil {
-		return err
+		return "", err
 	}
 
-	// Remove the temp dir regardless of outcome.
-	defer os.RemoveAll(tempDir)
+	defer os.Remove(downloadPath)
 
-	// 2. If wrapper is already installed, create a backup in case of installation failure.
-	_, existingErr := os.Stat(filepath.Join(dirpath, "VeracodeJavaAPI.jar"))
-	if existingErr == nil {
-		err = os.Rename(filepath.Join(dirpath, "VeracodeJavaAPI.jar"), filepath.Join(dirpath, "VeracodeJavaAPI_bup.jar"))
-		if err != nil {
-			return err
-		}
-	}
-
-	// 3. Copy newly installed wrapper in the temp folder to the destination folder.
-	err = copyTempUploader(tempFilePath, dirpath)
+	// Only include the VeracodeJavaAPI.jar file (archive contains help content as well)
+	err = extractZipArchive(downloadPath, dirPath, map[string]bool{"VeracodeJavaAPI.jar": true})
 	if err != nil {
-		// If copy fails, restore backup file.
-		if existingErr == nil {
-			err = os.Rename(filepath.Join(dirpath, "VeracodeJavaAPI_bup.jar"), filepath.Join(dirpath, "VeracodeJavaAPI.jar"))
-			if err != nil {
-				return err
-			}
-		}
-		return err
+		return "", err
 	}
 
-	// 4. Remove backup file.
-	if existingErr == nil {
-		os.Remove(filepath.Join(dirpath, "VeracodeJavaAPI_bup.jar"))
+	file, err := os.Create(filepath.Join(dirPath, "VERSION"))
+	if err != nil {
+		return "", err
 	}
 
-	return nil
+	defer file.Close()
+
+	_, err = file.WriteString(version)
+	if err != nil {
+		return "", err
+	}
+
+	return version, nil
 }
 
-// downloadTempUploader downloads the latest wrapper to a temp directory and returns the temp dir path and the file path.
-func downloadTempUploader(execPath string, version string) (string, string, error) {
-	tempDir, err := os.MkdirTemp("", "vosp-api-wrapper-java_*")
+// GetLatestUploaderVersion returns the latest version of the Veracode API wrapper jar.
+func GetLatestUploaderVersion(client *http.Client) (string, error) {
+	req, err := http.NewRequest(http.MethodGet, "https://repo1.maven.org/maven2/com/veracode/vosp/api/wrappers/vosp-api-wrappers-java/maven-metadata.xml", nil)
 	if err != nil {
-		return "", "", err
+		return "", err
 	}
 
-	cmd := exec.Command(execPath,
-		"dependency:copy",
-		fmt.Sprintf("-Dartifact=com.veracode.vosp.api.wrappers:vosp-api-wrappers-java:%s", version),
-		fmt.Sprintf("-DoutputDirectory=%s", tempDir),
-	)
-
-	out, err := cmd.CombinedOutput()
+	resp, err := client.Do(req)
 	if err != nil {
-		return "", "", errors.New(string(out))
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	bytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", err
 	}
 
-	fileList, err := os.ReadDir(tempDir)
-	if err != nil {
-		return "", "", err
+	type versioning struct {
+		Latest string `xml:"latest"`
 	}
 
-	return tempDir, filepath.Join(tempDir, fileList[0].Name()), nil
+	type meta struct {
+		Versioning versioning `xml:"versioning"`
+	}
+
+	var p meta
+
+	err = xml.Unmarshal(bytes, &p)
+	if err != nil {
+		return "", err
+	}
+
+	return p.Versioning.Latest, nil
 }
 
-// copyTempUploader copies the downloaded wrapper from the temp directory to the destination directory.
-func copyTempUploader(tempFilePath, dirPath string) error {
-	inFile, err := os.Open(tempFilePath)
+// downloadUploaderArchive streams the archive for the provided version from the remote source to
+// a temporarily local file.
+func downloadUploaderArchive(client *http.Client, version string) (string, error) {
+	file, err := os.CreateTemp("", "wrapper_*.zip")
 	if err != nil {
-		return err
+		return "", err
 	}
-	defer inFile.Close()
 
-	outFile, err := os.Create(filepath.Join(dirPath, "VeracodeJavaAPI.jar"))
+	defer file.Close()
+
+	resp, err := client.Get(fmt.Sprintf("https://repo1.maven.org/maven2/com/veracode/vosp/api/wrappers/vosp-api-wrappers-java/%s/vosp-api-wrappers-java-%s-dist.zip", version, version))
 	if err != nil {
-		return err
+		return "", err
 	}
-	defer outFile.Close()
 
-	_, err = io.Copy(outFile, inFile)
+	defer resp.Body.Close()
+
+	_, err = io.Copy(file, resp.Body)
 	if err != nil {
-		return err
+		return "", err
 	}
 
-	inFile.Close()
-
-	return nil
-}
-
-func installEmbeddedUploader(dirpath string) error {
-	err := os.MkdirAll(dirpath, 0600)
-	if err != nil {
-		return err
-	}
-	f, err := os.Create(filepath.Join(dirpath, "VeracodeJavaAPI.jar"))
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-
-	if _, err := io.Copy(f, bytes.NewReader(uploaderFileBytes)); err != nil {
-		return err
-	}
-	return nil
+	return file.Name(), nil
 }
 
 // InstallPackager installs the packager to the user's application directory. If shouldFullInstall
 // is true, it runs fullPackagerInstall otherwise it runs partialPackagerInstall. Check the docs for
 // those functions for more information.
 //
+// InstallPackager returns the version of the newly installed veracode CLI as well as an error if one
+// occurred.
+//
 // NOTE: This function is OS/ARCH agnostic, but the functions it calls are not. In order to build this
 // application for different environment, implement the required functions for that environment/tech.
-func InstallPackager(shouldFullyInstall bool, dirPath string) error {
+func InstallPackager(shouldFullyInstall bool, dirPath string) (string, error) {
 	if shouldFullyInstall {
 		return fullPackagerInstall()
 	} else {
@@ -165,38 +141,38 @@ func InstallPackager(shouldFullyInstall bool, dirPath string) error {
 //
 // NOTE: This function is OS/ARCH agnostic, but the functions it calls are not. In order to build this
 // application for different environment, implement the required functions for that environment/tech.
-func partialPackagerInstall(dirPath string) error {
+func partialPackagerInstall(dirPath string) (string, error) {
 	jar, _ := cookiejar.New(&cookiejar.Options{})
 	client := &http.Client{
 		Jar: jar,
 	}
 	baseURL, _ := url.Parse("https://tools.veracode.com/veracode-cli")
 
-	fileVersion, err := getLatestPackagerVersion(client, baseURL)
+	fileVersion, err := GetLatestPackagerVersion(client, baseURL)
 	if err != nil {
-		return err
+		return "", err
 	}
 	fileName, ext := getPackagerFileName(fileVersion)
 
 	downloadedPath, err := downloadPackagerArchive(client, baseURL, ext, fileName)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	defer os.Remove(downloadedPath)
 
-	err = extractPackagerArchive(downloadedPath, dirPath)
+	err = extractZipArchive(downloadedPath, dirPath, nil)
 	if err != nil {
-		return err
+		return "", err
 	}
 
-	return nil
+	return fileVersion, nil
 }
 
-// getLatestPackagerVersion gets the latest version of the packager.
+// GetLatestPackagerVersion gets the latest version of the packager.
 //
 // Typical Dev comment;)
-func getLatestPackagerVersion(client *http.Client, baseURL *url.URL) (string, error) {
+func GetLatestPackagerVersion(client *http.Client, baseURL *url.URL) (string, error) {
 	req, err := http.NewRequest(http.MethodGet, baseURL.JoinPath("/LATEST_VERSION").String(), nil)
 	if err != nil {
 		return "", err
@@ -239,4 +215,31 @@ func downloadPackagerArchive(client *http.Client, baseURL *url.URL, extension, f
 	}
 
 	return file.Name(), nil
+}
+
+// InstallScaAgent runs a package command with the CLI in order to install the SCA agent for the first time.
+// It is run in a folder that has nothing to package and therefore won't produce any artefacts.
+func InstallScaAgent(packagerPath string) error {
+	cmd := exec.Command(filepath.Join(packagerPath, "veracode"), "package", "--source", packagerPath, "-a")
+
+	out, err := cmd.CombinedOutput()
+	s := string(out)
+	if err != nil {
+		// exit status 4 is a build failure, but means that the packager ran successfully.
+		// We only care about other errors.
+		if err.Error() != "exit status 4" {
+			return fmt.Errorf("%s\n%s", err.Error(), s)
+		}
+	}
+
+	return nil
+}
+
+func GetLocalVersion(path string) string {
+	file, _ := os.ReadFile(path)
+	if len(file) < 1 {
+		return "na"
+	}
+
+	return string(file)
 }

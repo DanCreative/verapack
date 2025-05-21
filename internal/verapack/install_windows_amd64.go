@@ -47,14 +47,14 @@ func getPackagerFileName(version string) (string, string) {
 	// return "veracode-cli_" + version + "_windows_x86.tar.gz"
 }
 
-// extractPackagerArchive takes a source file path and a destination dir path and
+// extractZipArchive takes a source file path and a destination dir path and
 // decompresses the archive to the destination. It also flattens the filepaths from
 // the source archive.
 //
 // NOTE: This is the windows zip implementation.
 //
 // Credit to: https://gist.github.com/paulerickson/6d8650947ee4e3f3dbcc28fde10eaae7
-func extractPackagerArchive(source, destination string) error {
+func extractZipArchive(source, destination string, include map[string]bool) error {
 	archive, err := zip.OpenReader(source)
 	if err != nil {
 		return err
@@ -67,6 +67,12 @@ func extractPackagerArchive(source, destination string) error {
 	}
 
 	for _, file := range archive.Reader.File {
+		if include != nil {
+			if _, ok := include[file.Name]; !ok {
+				continue
+			}
+		}
+
 		reader, err := file.Open()
 		if err != nil {
 			return err
@@ -99,10 +105,14 @@ func extractPackagerArchive(source, destination string) error {
 	return nil
 }
 
+// Deprecated: Currently not in use.
+//
 // fullPackagerInstall runs the Powershell installation script.
 //
 // NOTE: This is the windows x86_64 implementation.
-func fullPackagerInstall() error {
+//
+// NOTE: Does not currently return the version.
+func fullPackagerInstall() (string, error) {
 	cmd := exec.Command("powershell", "-nologo", "-noprofile")
 
 	cmd.Stderr = os.Stderr
@@ -110,7 +120,7 @@ func fullPackagerInstall() error {
 
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	go func() {
@@ -120,19 +130,26 @@ func fullPackagerInstall() error {
 	}()
 
 	if err := cmd.Start(); err != nil {
-		return err
+		return "", err
 	}
 
 	if err := cmd.Wait(); err != nil {
-		return err
+		return "", err
 	}
 
-	return nil
+	return "", nil
 }
 
 // getPackagerLocation gets the directory path of the packager executable.
 //
 // NOTE: This is the windows implementation.
 func getPackagerLocation() string {
-	return filepath.Join(os.Getenv("AppData"), "veracode")
+	return filepath.Join(os.Getenv("AppData"), "veracode", "cli")
+}
+
+// getWrapperLocation gets the directory path of the wrapper jar file.
+//
+// NOTE: This is the windows implementation.
+func getWrapperLocation() string {
+	return filepath.Join(os.Getenv("AppData"), "veracode", "wrapper")
 }
