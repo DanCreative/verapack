@@ -91,7 +91,7 @@ func setup(cCtx *cli.Context) error {
 	var tasks []multistagesetup.SetupTask
 	tasks = append(tasks, Prerequisites())
 	tasks = append(tasks, SetupCredentials(homeDir)...)
-	tasks = append(tasks, SetupConfig(homeDir, appDir), InstallDependencyPackager(), InstallDependencyWrapper(appDir))
+	tasks = append(tasks, SetupConfig(homeDir, appDir), InstallDependencyPackager(), InstallDependencyWrapper(), SetupInstallScaAgent())
 
 	p := tea.NewProgram(multistagesetup.NewModel(
 		multistagesetup.WithSpinner(defaultSpinnerOpts...),
@@ -169,7 +169,7 @@ func sandbox(cCtx *cli.Context) error {
 	startChan := make(chan struct{})
 	var m tea.Model
 	ctx := context.Background()
-	uploaderPath := filepath.Join(homeDir, ".veracode", "verapack", "VeracodeJavaAPI.jar")
+	uploaderPath := filepath.Join(getWrapperLocation(), "VeracodeJavaAPI.jar")
 	path := os.Getenv("PATH")
 	os.Setenv("PATH", path+";"+getPackagerLocation())
 
@@ -329,7 +329,7 @@ func promote(cCtx *cli.Context) error {
 	startChan := make(chan struct{})
 	var m tea.Model
 	ctx := context.Background()
-	uploaderPath := filepath.Join(homeDir, ".veracode", "verapack", "VeracodeJavaAPI.jar")
+	uploaderPath := filepath.Join(getWrapperLocation(), "VeracodeJavaAPI.jar")
 	path := os.Getenv("PATH")
 	os.Setenv("PATH", path+";"+getPackagerLocation())
 
@@ -529,7 +529,7 @@ func policy(cCtx *cli.Context) error {
 		return err
 	}
 
-	uploaderPath := filepath.Join(homeDir, ".veracode", "verapack", "VeracodeJavaAPI.jar")
+	uploaderPath := filepath.Join(getWrapperLocation(), "VeracodeJavaAPI.jar")
 
 	c, err := ReadConfig(filepath.Join(homeDir, ".veracode", "verapack", "config.yaml"))
 	if err != nil {
@@ -622,14 +622,6 @@ func configureCredentials(cCtx *cli.Context) error {
 }
 
 func update(cCtx *cli.Context) error {
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		fmt.Print(renderErrors(err))
-		return err
-	}
-
-	appDir := filepath.Join(homeDir, ".veracode", "verapack")
-
 	p := tea.NewProgram(multistagesetup.NewModel(
 		multistagesetup.WithSpinner(defaultSpinnerOpts...),
 		multistagesetup.WithStyles(multistagesetup.Styles{
@@ -647,7 +639,8 @@ func update(cCtx *cli.Context) error {
 		multistagesetup.WithTasks(
 			Prerequisites(),
 			UpdateDependencyPackager(),
-			UpdateDependencyWrapper(appDir),
+			UpdateDependencyWrapper(),
+			SetupInstallScaAgent(),
 		),
 	))
 	if _, err := p.Run(); err != nil {

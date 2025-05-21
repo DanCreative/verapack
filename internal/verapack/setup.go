@@ -4,6 +4,9 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"net/http"
+	"net/http/cookiejar"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -359,52 +362,99 @@ func InstallDependencyPackager() multistagesetup.SetupTask {
 		var err error
 
 		if _, err = os.Stat(packagerPath); err == nil {
-			return multistagesetup.NewSkippedTaskResult("already installed")
+			localVersion := GetLocalVersion(filepath.Join(packagerPath, "VERSION"))
+			return multistagesetup.NewSkippedTaskResult("already installed version: " + localVersion)
 		}
 
-		if err = InstallPackager(false, packagerPath); err != nil {
+		version, err := InstallPackager(false, packagerPath)
+		if err != nil {
 			return multistagesetup.NewFailedTaskResult("", err)
 		}
 
-		return multistagesetup.NewSuccessfulTaskResult("successfully installed")
+		return multistagesetup.NewSuccessfulTaskResult("successfully installed version: " + version)
 	}))
 }
 
 func UpdateDependencyPackager() multistagesetup.SetupTask {
 	return multistagesetup.NewSetupTask("Update Veracode CLI", NewSimpleTask(func() tea.Msg {
 		packagerPath := getPackagerLocation()
+		packagerCurrentVersion := GetLocalVersion(filepath.Join(getPackagerLocation(), "VERSION"))
 
-		if err := InstallPackager(false, packagerPath); err != nil {
-			return multistagesetup.NewFailedTaskResult("", err)
+		jar, _ := cookiejar.New(&cookiejar.Options{})
+		client := &http.Client{
+			Jar: jar,
+		}
+		baseURL, _ := url.Parse("https://tools.veracode.com/veracode-cli")
+
+		fileVersion, _ := GetLatestPackagerVersion(client, baseURL)
+
+		if fileVersion == packagerCurrentVersion {
+			return multistagesetup.NewSkippedTaskResult("already on the latest version: " + fileVersion)
 		}
 
-		return multistagesetup.NewSuccessfulTaskResult("successfully updated")
-	}))
-}
-
-func InstallDependencyWrapper(appDir string) multistagesetup.SetupTask {
-	return multistagesetup.NewSetupTask("Install Veracode Uploader", NewSimpleTask(func() tea.Msg {
-		var err error
-		if _, err = os.Stat(filepath.Join(appDir, "VeracodeJavaAPI.jar")); err == nil {
-			return multistagesetup.NewSkippedTaskResult("already installed")
-		}
-
-		err = InstallUploader(appDir, "")
+		version, err := InstallPackager(false, packagerPath)
 		if err != nil {
 			return multistagesetup.NewFailedTaskResult("", err)
 		}
 
-		return multistagesetup.NewSuccessfulTaskResult("successfully installed")
+		return multistagesetup.NewSuccessfulTaskResult(fmt.Sprintf("successfully updated: %s -> %s", packagerCurrentVersion, version))
 	}))
 }
 
-func UpdateDependencyWrapper(appDir string) multistagesetup.SetupTask {
-	return multistagesetup.NewSetupTask("Update Veracode Uploader", NewSimpleTask(func() tea.Msg {
-		if err := InstallUploader(appDir, ""); err != nil {
+func InstallDependencyWrapper() multistagesetup.SetupTask {
+	return multistagesetup.NewSetupTask("Install Veracode Uploader", NewSimpleTask(func() tea.Msg {
+		wrapperPath := getWrapperLocation()
+
+		var err error
+
+		if _, err = os.Stat(filepath.Join(wrapperPath, "VeracodeJavaAPI.jar")); err == nil {
+			localVersion := GetLocalVersion(filepath.Join(wrapperPath, "VERSION"))
+			return multistagesetup.NewSkippedTaskResult("already installed version: " + localVersion)
+		}
+
+		version, err := InstallUploader(wrapperPath)
+		if err != nil {
 			return multistagesetup.NewFailedTaskResult("", err)
 		}
 
-		return multistagesetup.NewSuccessfulTaskResult("successfully updated")
+		return multistagesetup.NewSuccessfulTaskResult("successfully installed version: " + version)
+	}))
+}
+
+func UpdateDependencyWrapper() multistagesetup.SetupTask {
+	return multistagesetup.NewSetupTask("Update Veracode Uploader", NewSimpleTask(func() tea.Msg {
+		wrapperPath := getWrapperLocation()
+		wrapperCurrentVersion := GetLocalVersion(filepath.Join(wrapperPath, "VERSION"))
+
+		jar, _ := cookiejar.New(&cookiejar.Options{})
+		client := &http.Client{
+			Jar: jar,
+		}
+
+		latestVersion, _ := GetLatestUploaderVersion(client)
+
+		if wrapperCurrentVersion == latestVersion {
+			return multistagesetup.NewSkippedTaskResult("already on the latest version: " + wrapperCurrentVersion)
+		}
+
+		version, err := InstallUploader(wrapperPath)
+		if err != nil {
+			return multistagesetup.NewFailedTaskResult("", err)
+		}
+
+		return multistagesetup.NewSuccessfulTaskResult(fmt.Sprintf("successfully updated: %s -> %s", wrapperCurrentVersion, version))
+	}))
+}
+
+func SetupInstallScaAgent() multistagesetup.SetupTask {
+	return multistagesetup.NewSetupTask("Install SCA Agent", NewSimpleTask(func() tea.Msg {
+		packagerPath := getPackagerLocation()
+
+		if err := InstallScaAgent(packagerPath); err != nil {
+			return multistagesetup.NewFailedTaskResult("", err)
+		}
+
+		return multistagesetup.NewSuccessfulTaskResult("successfully installed")
 	}))
 }
 
@@ -415,12 +465,7 @@ func Prerequisites() multistagesetup.SetupTask {
 				warnings: make([]string, 0, 2),
 			}
 
-			_, err := exec.LookPath("mvn")
-			if err != nil {
-				p.warnings = append(p.warnings, "Maven was not found on the path. It is required in order to install the latest version of the uploader.")
-			}
-
-			_, err = exec.LookPath("java")
+			_, err := exec.LookPath("java")
 			if err != nil {
 				p.warnings = append(p.warnings, "Java was not found on the path. You can either install Java version 8, 11 or 17.")
 			}
