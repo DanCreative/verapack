@@ -91,7 +91,7 @@ func setup(cCtx *cli.Context) error {
 	var tasks []multistagesetup.SetupTask
 	tasks = append(tasks, Prerequisites())
 	tasks = append(tasks, SetupCredentials(homeDir)...)
-	tasks = append(tasks, SetupConfig(homeDir, appDir), InstallDependencyPackager(), InstallDependencyWrapper(appDir))
+	tasks = append(tasks, SetupConfig(homeDir, appDir), InstallDependencyPackager(), InstallDependencyWrapper(), SetupInstallScaAgent())
 
 	p := tea.NewProgram(multistagesetup.NewModel(
 		multistagesetup.WithSpinner(defaultSpinnerOpts...),
@@ -622,14 +622,6 @@ func configureCredentials(cCtx *cli.Context) error {
 }
 
 func update(cCtx *cli.Context) error {
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		fmt.Print(renderErrors(err))
-		return err
-	}
-
-	appDir := filepath.Join(homeDir, ".veracode", "verapack")
-
 	p := tea.NewProgram(multistagesetup.NewModel(
 		multistagesetup.WithSpinner(defaultSpinnerOpts...),
 		multistagesetup.WithStyles(multistagesetup.Styles{
@@ -647,7 +639,8 @@ func update(cCtx *cli.Context) error {
 		multistagesetup.WithTasks(
 			Prerequisites(),
 			UpdateDependencyPackager(),
-			UpdateDependencyWrapper(appDir),
+			UpdateDependencyWrapper(),
+			SetupInstallScaAgent(),
 		),
 	))
 	if _, err := p.Run(); err != nil {
