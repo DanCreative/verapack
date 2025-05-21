@@ -12,11 +12,11 @@ default:
   
 applications:
   # Add your applications' config here. These values will override the defaults specified above.
-  - app_name: Example                   # Name of the application profile.
-    package_source: C:\\app\\source     # Package source for given source type. If present, auto-packager will be used.
+  - app_name: Example                     # Name of the application profile.
+    package_source: C:\app\source         # Package source for given source type. If present, auto-packager will be used.
     # OR: 
-    # artefact_paths:                   # If auto-packaging is not required, you can remove 'package_source' and add the dirs and/or files to be uploaded here.
-    #   - C:\\path\\to\\dir
-    #   - C:\\path\\to\\package.zip 
+    # artefact_paths:                     # If auto-packaging is not required, you can remove 'package_source' and add the dirs and/or files to be uploaded here.
+    #   - C:\path\to\dir
+    #   - C:\path\to\package.zip 
   - app_name: Example 2
-    package_source: C:\\app\\source2
+    package_source: C:\app\source2
