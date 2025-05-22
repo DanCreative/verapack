@@ -75,17 +75,3 @@ func UploadAndScanApplication(options Options, writer io.Writer) (string, error)
 
 	return out, nil
 }
-
-func versionUploader(uploaderPath string) string {
-	path, err := exec.LookPath("java")
-	if err != nil {
-		return "Java and Uploader not installed"
-	}
-
-	cmd := exec.Command(path, "-jar", uploaderPath, "-wrapperversion")
-	if out, err := cmd.CombinedOutput(); err != nil {
-		return "Uploader not installed"
-	} else {
-		return string(out)
-	}
-}

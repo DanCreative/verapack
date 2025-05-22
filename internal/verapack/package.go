@@ -86,21 +86,6 @@ func PackageApplication(options Options, writer io.Writer) ([]string, string, er
 	return artefacts, out, nil
 }
 
-func versionPackager() string {
-	path, err := exec.LookPath("veracode")
-	if err != nil {
-		return "Packager not installed"
-	}
-
-	cmd := exec.Command(path, "version")
-
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		return "Packager not installed"
-	}
-	return string(out)
-}
-
 // getArtefactPath takes a directory string and returns a []string of the artefact paths
 // in that directory.
 func getArtefactPath(dirPath string) ([]string, error) {

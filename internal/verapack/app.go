@@ -6,14 +6,18 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/cookiejar"
+	"net/url"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/DanCreative/veracode-go/veracode"
 	sand "github.com/DanCreative/verapack/internal/components/middleware/sandbox"
 	"github.com/DanCreative/verapack/internal/components/middleware/singleselect"
 	"github.com/DanCreative/verapack/internal/components/multistagesetup"
 	"github.com/DanCreative/verapack/internal/components/reportcard"
+	"github.com/DanCreative/verapack/internal/components/version"
+	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/urfave/cli/v2"
@@ -651,17 +655,38 @@ func update(cCtx *cli.Context) error {
 }
 
 func VersionPrinter(cCtx *cli.Context) {
-	var vUploader string
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		vUploader = "Can't access Uploader"
+	jar, _ := cookiejar.New(&cookiejar.Options{})
+
+	httpClient := &http.Client{
+		Jar: jar,
 	}
-	vUploader = versionUploader(filepath.Join(homeDir, ".veracode", "verapack", "VeracodeJavaAPI.jar"))
 
-	path := os.Getenv("PATH")
-	os.Setenv("PATH", path+";"+getPackagerLocation())
+	m := version.NewModel(
+		GetLocalVersion(filepath.Join(getWrapperLocation(), "VERSION")),
+		GetLocalVersion(filepath.Join(getPackagerLocation(), "VERSION")),
+		cCtx.App.Version,
+		cCtx.App.Name,
+		func() (string, error) {
+			return GetLatestUploaderVersion(httpClient)
+		},
+		func() (string, error) {
+			baseURL, _ := url.Parse("https://tools.veracode.com/veracode-cli")
+			return GetLatestPackagerVersion(httpClient, baseURL)
+		},
+		version.WithSpinner([]spinner.Option{
+			spinner.WithSpinner(spinner.Spinner{
+				Frames: []string{"⣾", "⣽", "⣻", "⢿", "⡿", "⣟", "⣯", "⣷"},
+				FPS:    time.Second / 10,
+			}),
+			spinner.WithStyle(darkGrayForeground),
+		}...),
+		version.WithStyles(version.Styles{
+			Muted: darkGrayForeground,
+			Loud:  lipgloss.NewStyle().Foreground(orange),
+		}),
+	)
 
-	fmt.Printf("%s version %s\n%s%s", cCtx.App.Name, cCtx.App.Version, versionPackager(), vUploader)
+	tea.NewProgram(m).Run()
 }
 
 func PrepareReportCard(c Config) reportcard.Model {
