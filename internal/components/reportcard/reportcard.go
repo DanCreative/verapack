@@ -120,18 +120,26 @@ type selector[T any] struct {
 	selectableItems    [][]*T // using pointer to easily check if selected
 }
 
-func (s *selector[T]) MoveCursor(direction cursorDirection) (T, int, int) {
+// MoveCursor moves the selector cursor in the direction provided.
+//
+// It returns the currently selected item if it did not move and the new item if it did.
+// It also returns the row and column index, and a bool indicating whether it moved or not.
+func (s *selector[T]) MoveCursor(direction cursorDirection) (T, int, int, bool) {
+	var didMove bool
+
 	switch direction {
 	case up:
 	upOuter:
 		for i := s.selectedItemRow - 1; i >= 0; i-- {
 			if s.selectableItems[i][s.selectedItemColumn] != nil {
 				s.selectedItemRow = i
+				didMove = true
 			} else {
 				for j := range len(s.selectableItems[i]) {
 					if s.selectableItems[i][j] != nil {
 						s.selectedItemColumn = j
 						s.selectedItemRow = i
+						didMove = true
 						break upOuter
 					}
 				}
@@ -142,11 +150,14 @@ func (s *selector[T]) MoveCursor(direction cursorDirection) (T, int, int) {
 		for i := s.selectedItemRow + 1; i < len(s.selectableItems); i++ {
 			if s.selectableItems[i][s.selectedItemColumn] != nil {
 				s.selectedItemRow = i
+				didMove = true
+
 			} else {
 				for j := range len(s.selectableItems[i]) {
 					if s.selectableItems[i][j] != nil {
 						s.selectedItemColumn = j
 						s.selectedItemRow = i
+						didMove = true
 						break downOuter
 					}
 				}
@@ -156,6 +167,7 @@ func (s *selector[T]) MoveCursor(direction cursorDirection) (T, int, int) {
 		for i := s.selectedItemColumn + 1; i < len(s.selectableItems[s.selectedItemRow]); i++ {
 			if s.selectableItems[s.selectedItemRow][i] != nil {
 				s.selectedItemColumn = i
+				didMove = true
 				break
 			}
 		}
@@ -163,12 +175,13 @@ func (s *selector[T]) MoveCursor(direction cursorDirection) (T, int, int) {
 		for i := s.selectedItemColumn - 1; i >= 0; i-- {
 			if s.selectableItems[s.selectedItemRow][i] != nil {
 				s.selectedItemColumn = i
+				didMove = true
 				break
 			}
 		}
 	}
 
-	return *s.selectableItems[s.selectedItemRow][s.selectedItemColumn], s.selectedItemRow, s.selectedItemColumn
+	return *s.selectableItems[s.selectedItemRow][s.selectedItemColumn], s.selectedItemRow, s.selectedItemColumn, didMove
 }
 
 func (s *selector[T]) AddSelectable(item T, row, col int) {
@@ -320,7 +333,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// get the width of the terminal
 		m.termWidth = msg.Width
 
-		m.output.viewport.setWrappedLines(int(float64(m.termWidth) * 0.6))
+		// if m.showOutput {
+		// 	m.output.viewport.setWrappedLines(int(float64(m.termWidth) * 0.6))
+		// }
 
 	case tea.KeyMsg:
 		switch {
@@ -332,30 +347,44 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		case key.Matches(msg, m.KeyMap.ColLeft):
 			// If there is output to show, move left on the table.
-			item, _, _ := m.selector.MoveCursor(left)
-			m.output.SetContent(item.Output, int(float64(m.termWidth)*0.6))
+			item, _, _, didMove := m.selector.MoveCursor(left)
+			if didMove {
+				// Only update the content if the cursor actually moved.
+				m.output.SetContent(item.Output, int(float64(m.termWidth)*0.6))
+			}
 
 		case key.Matches(msg, m.KeyMap.ColRight):
 			// If there is output to show, move right on the table.
-			item, _, _ := m.selector.MoveCursor(right)
-			m.output.SetContent(item.Output, int(float64(m.termWidth)*0.6))
+			item, _, _, didMove := m.selector.MoveCursor(right)
+			if didMove {
+				// Only update the content if the cursor actually moved.
+				m.output.SetContent(item.Output, int(float64(m.termWidth)*0.6))
+			}
 
 		case key.Matches(msg, m.KeyMap.LineDown):
 			// If there is output to show, move down on the table.
-			item, _, _ := m.selector.MoveCursor(down)
-			m.output.SetContent(item.Output, int(float64(m.termWidth)*0.6))
+			item, _, _, didMove := m.selector.MoveCursor(down)
+			if didMove {
+				// Only update the content if the cursor actually moved.
+				m.output.SetContent(item.Output, int(float64(m.termWidth)*0.6))
+			}
 
 		case key.Matches(msg, m.KeyMap.LineUp):
 			// If there is output to show, move down on the table.
-			item, _, _ := m.selector.MoveCursor(up)
-			m.output.SetContent(item.Output, int(float64(m.termWidth)*0.6))
+			item, _, _, didMove := m.selector.MoveCursor(up)
+			if didMove {
+				// Only update the content if the cursor actually moved.
+				m.output.SetContent(item.Output, int(float64(m.termWidth)*0.6))
+			}
 
 		case key.Matches(msg, m.KeyMap.ShowOutput):
 			// If there is output to show, show/hide the output.
 			m.showOutput = !m.showOutput
 
 			if m.showOutput {
-				m.output.viewport.setWrappedLines(int(float64(m.termWidth) * 0.6))
+				// m.output.viewport.setWrappedLines(int(float64(m.termWidth) * 0.6))
+				item, _, _ := m.selector.GetSelected()
+				m.output.SetContent(item.Output, int(float64(m.termWidth)*0.6))
 			}
 
 		case key.Matches(msg, m.KeyMap.PageDown):
@@ -402,7 +431,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if !m.notFirstCompletedTask {
 				// for that first task that completes, enable keys and set the output content.
 				m.setCanShowOutput()
-				m.output.SetContent(msg.Output, int(float64(m.termWidth)*0.6))
 				m.notFirstCompletedTask = true
 			}
 			msg.taskIndex = taskIndex
