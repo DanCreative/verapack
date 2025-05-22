@@ -41,50 +41,6 @@ func renderBodyText(applications []*Options) string {
 
 // promoteSandbox finds the application profile and sandbox details
 func promoteSandbox(client *veracode.Client, ctx context.Context, app Options, appId int, reporter reporter) {
-	// // Find application profile with name
-	// profiles, _, err := client.Application.ListApplications(ctx, veracode.ListApplicationOptions{Name: app.AppName})
-	// if err != nil {
-	// 	reporter.Send(reportcard.TaskResultMsg{
-	// 		Status:  reportcard.Failure,
-	// 		Output:  err.Error(),
-	// 		Index:   appId,
-	// 		IsFatal: true,
-	// 	})
-	// 	return
-	// }
-
-	// if len(profiles) == 0 {
-	// 	// Could not find an application profile with name
-	// 	reporter.Send(reportcard.TaskResultMsg{
-	// 		Status:  reportcard.Failure,
-	// 		Output:  fmt.Sprintf("no application profile found with name: '%s'", app.AppName),
-	// 		Index:   appId,
-	// 		IsFatal: true,
-	// 	})
-	// 	return
-	// }
-
-	// if len(profiles) > 1 {
-	// 	reporter.Send(reportcard.TaskResultMsg{
-	// 		Status:  reportcard.Failure,
-	// 		Output:  fmt.Sprintf("more than 1 application profile found with name: '%s'", app.AppName),
-	// 		Index:   appId,
-	// 		IsFatal: true,
-	// 	})
-	// 	return
-	// }
-
-	// sandbox, _, err := client.Sandbox.GetSandbox(ctx, profiles[0].Guid, app.SandboxGuid)
-	// if err != nil {
-	// 	reporter.Send(reportcard.TaskResultMsg{
-	// 		Status:  reportcard.Failure,
-	// 		Output:  err.Error(),
-	// 		Index:   appId,
-	// 		IsFatal: true,
-	// 	})
-	// 	return
-	// }
-
 	_, _, err := client.Sandbox.PromoteSandbox(ctx, app.AppGuid, app.SandboxGuid, true)
 	if err != nil {
 		reporter.Send(reportcard.TaskResultMsg{
