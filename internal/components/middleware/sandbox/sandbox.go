@@ -297,12 +297,14 @@ func SearchApplication(applicationName string, appIndex int, client *veracode.Cl
 			return msg
 		}
 
-		if len(profiles) > 1 {
-			msg.err = fmt.Errorf("more than 1 application profile found with name: '%s'", applicationName)
-			return msg
+		for _, profile := range profiles {
+			if strings.EqualFold(profile.Profile.Name, applicationName) {
+				msg.appGuid = profile.Guid
+				return msg
+			}
 		}
 
-		msg.appGuid = profiles[0].Guid
+		msg.err = fmt.Errorf("no application profile found with name: '%s'", applicationName)
 		return msg
 	}
 }

@@ -191,6 +191,7 @@ func sandbox(cCtx *cli.Context) error {
 				Border: lipgloss.NewStyle().
 					Padding(0, 1, 1, 1).
 					Margin(0, 0, 0, 2).
+					BorderForeground(darkGray).
 					Border(lipgloss.RoundedBorder()),
 			}),
 			singleselect.WithPostFunc(func(selection int, model singleselect.Model) (tea.Model, tea.Cmd) {
@@ -210,7 +211,7 @@ func sandbox(cCtx *cli.Context) error {
 						sand.WithSpinner(defaultSpinnerOpts...),
 						sand.WithErrorRenderFunc(rawRenderErrors),
 						sand.WithStyles(sand.Styles{
-							Border: lipgloss.NewStyle().Padding(0, 1, 1, 1).Margin(0, 0, 0, 2).Border(lipgloss.RoundedBorder()),
+							Border: lipgloss.NewStyle().Padding(0, 1, 1, 1).Margin(0, 0, 0, 2).BorderForeground(darkGray).Border(lipgloss.RoundedBorder()),
 							Counts: darkGrayForeground,
 						}),
 						sand.WithPostFunc(func(model sand.Model, size tea.WindowSizeMsg) (tea.Model, tea.Cmd) {
@@ -248,7 +249,7 @@ func sandbox(cCtx *cli.Context) error {
 			sand.WithSpinner(defaultSpinnerOpts...),
 			sand.WithErrorRenderFunc(rawRenderErrors),
 			sand.WithStyles(sand.Styles{
-				Border: lipgloss.NewStyle().Padding(0, 1, 1, 1).Margin(0, 0, 0, 2).Border(lipgloss.RoundedBorder()),
+				Border: lipgloss.NewStyle().Padding(0, 1, 1, 1).Margin(0, 0, 0, 2).BorderForeground(darkGray).Border(lipgloss.RoundedBorder()),
 				Counts: darkGrayForeground,
 			}),
 			sand.WithPostFunc(func(model sand.Model, size tea.WindowSizeMsg) (tea.Model, tea.Cmd) {
@@ -393,7 +394,7 @@ func promote(cCtx *cli.Context) error {
 						sand.WithSpinner(defaultSpinnerOpts...),
 						sand.WithErrorRenderFunc(rawRenderErrors),
 						sand.WithStyles(sand.Styles{
-							Border: lipgloss.NewStyle().Padding(0, 1, 1, 1).Margin(0, 0, 0, 2).Border(lipgloss.RoundedBorder()),
+							Border: lipgloss.NewStyle().Padding(0, 1, 1, 1).Margin(0, 0, 0, 2).BorderForeground(darkGray).Border(lipgloss.RoundedBorder()),
 							Counts: darkGrayForeground,
 						}),
 						sand.WithPostFunc(func(model sand.Model, size tea.WindowSizeMsg) (tea.Model, tea.Cmd) {
@@ -430,7 +431,7 @@ func promote(cCtx *cli.Context) error {
 						sand.WithSpinner(defaultSpinnerOpts...),
 						sand.WithErrorRenderFunc(rawRenderErrors),
 						sand.WithStyles(sand.Styles{
-							Border: lipgloss.NewStyle().Padding(0, 1, 1, 1).Margin(0, 0, 0, 2).Border(lipgloss.RoundedBorder()),
+							Border: lipgloss.NewStyle().Padding(0, 1, 1, 1).Margin(0, 0, 0, 2).BorderForeground(darkGray).Border(lipgloss.RoundedBorder()),
 							Counts: darkGrayForeground,
 						}),
 						sand.WithPostFunc(func(model sand.Model, size tea.WindowSizeMsg) (tea.Model, tea.Cmd) {
@@ -466,6 +467,7 @@ func promote(cCtx *cli.Context) error {
 				Border: lipgloss.NewStyle().
 					Padding(0, 1, 1, 1).
 					Margin(0, 0, 0, 2).
+					BorderForeground(darkGray).
 					Border(lipgloss.RoundedBorder()),
 			}),
 			singleselect.WithPostFunc(afterFunc),
@@ -479,7 +481,7 @@ func promote(cCtx *cli.Context) error {
 			sand.WithSpinner(defaultSpinnerOpts...),
 			sand.WithErrorRenderFunc(rawRenderErrors),
 			sand.WithStyles(sand.Styles{
-				Border: lipgloss.NewStyle().Padding(0, 1, 1, 1).Margin(0, 0, 0, 2).Border(lipgloss.RoundedBorder()),
+				Border: lipgloss.NewStyle().Padding(0, 1, 1, 1).BorderForeground(darkGray).Margin(0, 0, 0, 2).Border(lipgloss.RoundedBorder()),
 				Counts: darkGrayForeground,
 			}),
 			sand.WithPostFunc(func(model sand.Model, size tea.WindowSizeMsg) (tea.Model, tea.Cmd) {

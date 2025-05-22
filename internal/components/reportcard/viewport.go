@@ -51,30 +51,24 @@ type Viewport struct {
 	// which is usually via the alternate screen buffer.
 	HighPerformanceRendering bool
 
-	initialized  bool
-	lines        []string
-	wrappedLines int
+	initialized bool
+	lines       []string
 }
 
 func (m *Viewport) setWrappedLines(width int) {
-	// 1. Remove artificial padding
-	m.lines = m.lines[:len(m.lines)-m.wrappedLines]
-
-	// 2. Determine and set new padding
-	var w int
+	// 1. Determine new number of wrapped lines
+	var newWrappedCount int
 
 	for _, line := range m.lines {
 		if len(line) > 0 {
 			if wraps := lipgloss.Width(line) / width; wraps > 0 {
-				w += wraps
+				newWrappedCount += wraps
 			}
 		}
 	}
 
-	m.wrappedLines = w
-
-	// 3. Add new padding
-	l := make([]string, m.wrappedLines)
+	// Add new padding
+	l := make([]string, newWrappedCount)
 
 	m.lines = append(m.lines, l...)
 }
