@@ -1,0 +1,24 @@
+default:
+  type: directory
+  sandbox_name: Dev
+  auto_cleanup: true
+
+applications:
+  - app_name: The Vera & the Demo                 
+    package_source: C:\app\source 
+  - app_name: 2 Vera 2 Demo                
+    package_source: C:\app\source 
+  - app_name: Vera & Demo               
+    package_source: C:\app\source 
+  - app_name: Vera 5              
+    package_source: C:\app\source 
+  - app_name: Vera & Demo 6                
+    package_source: C:\app\source 
+  - app_name: Vera & Demo 6                
+    package_source: C:\app\source 
+  - app_name: Vera & Demo Tokyo Drift              
+    package_source: C:\app\source 
+  - app_name: Demo 7          
+    package_source: C:\app\source 
+  - app_name: The fate of the demo         
+    package_source: C:\app\source 
