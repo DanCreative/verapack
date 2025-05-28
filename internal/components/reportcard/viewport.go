@@ -53,6 +53,10 @@ type Viewport struct {
 
 	initialized bool
 	lines       []string
+
+	wrappedLines int
+	top          int
+	bottom       int
 }
 
 func (m *Viewport) setWrappedLines(width int) {
@@ -69,6 +73,8 @@ func (m *Viewport) setWrappedLines(width int) {
 
 	// Add new padding
 	l := make([]string, newWrappedCount)
+
+	m.wrappedLines = newWrappedCount
 
 	m.lines = append(m.lines, l...)
 }
@@ -206,9 +212,9 @@ func (m *Viewport) LineDown(n int) (lines []string) {
 	m.SetYOffset(m.YOffset + n)
 
 	// Gather lines to send off for performance scrolling.
-	bottom := clamp(m.YOffset+m.Height, 0, len(m.lines))
-	top := clamp(m.YOffset+m.Height-n, 0, bottom)
-	return m.lines[top:bottom]
+	m.bottom = clamp(m.YOffset+m.Height, 0, len(m.lines))
+	m.top = clamp(m.YOffset+m.Height-n, 0, m.bottom)
+	return m.lines[m.top:m.bottom]
 }
 
 // LineUp moves the view down by the given number of lines. Returns the new
@@ -223,9 +229,9 @@ func (m *Viewport) LineUp(n int) (lines []string) {
 	m.SetYOffset(m.YOffset - n)
 
 	// Gather lines to send off for performance scrolling.
-	top := max(0, m.YOffset)
-	bottom := clamp(m.YOffset+n, 0, m.maxYOffset())
-	return m.lines[top:bottom]
+	m.top = max(0, m.YOffset)
+	m.bottom = clamp(m.YOffset+n, 0, m.maxYOffset())
+	return m.lines[m.top:m.bottom]
 }
 
 // TotalLineCount returns the total number of lines (both hidden and visible) within the viewport.
