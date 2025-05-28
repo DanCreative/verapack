@@ -12,7 +12,7 @@ func newTestSelector[T any](selectables [][]*T, selectedCol, selectedRow int) *s
 
 func Test_selector_MoveCursor(t *testing.T) {
 	type args struct {
-		direction cursorDirection
+		direction direction
 	}
 	tests := []struct {
 		name    string
@@ -204,7 +204,7 @@ func Test_selector_MoveCursor(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, gotRow, gotCol, _ := tt.s.MoveCursor(tt.args.direction)
+			_, gotRow, gotCol, _ := tt.s.MoveCursor(tt.args.direction, 1)
 			if gotRow != tt.wantRow {
 				t.Errorf("selector.MoveCursor() gotRow = %v, want %v", gotRow, tt.wantRow)
 			}

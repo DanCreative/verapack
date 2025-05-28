@@ -3,6 +3,8 @@ package reportcard
 import (
 	"fmt"
 	"math"
+	"strconv"
+	"strings"
 
 	"github.com/charmbracelet/bubbles/help"
 	"github.com/charmbracelet/bubbles/key"
@@ -22,10 +24,11 @@ const (
 )
 
 const (
-	spacebar = " "
-
 	// Minimum width of the name column. (the name column is sized dynamically based on the longest name)
 	minNameLength = 4
+
+	// Default page size. Will be used if no page size is provided.
+	defaultPageSize = 6
 )
 
 type TaskResultMsg struct {
@@ -48,6 +51,7 @@ type Row struct {
 	Name         string
 	Tasks        []Task
 	PrefixValues []string
+	FinalStatus  TaskStatus
 }
 
 type Column struct {
@@ -65,21 +69,23 @@ type Styles struct {
 
 type KeyMap struct {
 	// Summary
-	LineUp     key.Binding
-	LineDown   key.Binding
-	ColLeft    key.Binding
-	ColRight   key.Binding
-	ShowOutput key.Binding
-	Quit       key.Binding
-	Help       key.Binding
+	LineUp          key.Binding
+	LineDown        key.Binding
+	ColLeft         key.Binding
+	ColRight        key.Binding
+	PageDownSummary key.Binding
+	PageUpSummary   key.Binding
+	ShowOutput      key.Binding
+	Quit            key.Binding
+	Help            key.Binding
 
 	// Output
-	PageDown     key.Binding
-	PageUp       key.Binding
-	HalfPageUp   key.Binding
-	HalfPageDown key.Binding
-	Down         key.Binding
-	Up           key.Binding
+	PageDown     key.Binding // Move a full page down in the output
+	PageUp       key.Binding // Move a full page up in the output
+	HalfPageUp   key.Binding // Move half a page up in the output
+	HalfPageDown key.Binding // Move half a page down in the output
+	Down         key.Binding // Move one line down in the output
+	Up           key.Binding // Move one line up in the output
 }
 
 // report card assumes that tasks are completed sequentially and it assumes that once a task is done, it is done.
@@ -101,12 +107,20 @@ type Model struct {
 	selector              selector[TaskResultMsg]
 	termWidth             int // termWidth contains the width of the terminal. This is used to dynamically size the output window.
 	notFirstCompletedTask bool
+
+	pageSize         int // total rows per page
+	pageCurrentStart int // the first row on the current page
+	pageCurrentEnd   int // the last row on the current page
+
+	failureCount    int
+	successCount    int
+	inProgressCount int
 }
 
-type cursorDirection int
+type direction int
 
 const (
-	up cursorDirection = iota
+	up direction = iota
 	right
 	down
 	left
@@ -120,20 +134,21 @@ type selector[T any] struct {
 	selectableItems    [][]*T // using pointer to easily check if selected
 }
 
-// MoveCursor moves the selector cursor in the direction provided.
+// MoveCursor moves the selector cursor in the direction provided for step int provided.
 //
 // It returns the currently selected item if it did not move and the new item if it did.
 // It also returns the row and column index, and a bool indicating whether it moved or not.
-func (s *selector[T]) MoveCursor(direction cursorDirection) (T, int, int, bool) {
+func (s *selector[T]) MoveCursor(direction direction, step int) (T, int, int, bool) {
 	var didMove bool
 
 	switch direction {
 	case up:
 	upOuter:
-		for i := s.selectedItemRow - 1; i >= 0; i-- {
+		for i := s.selectedItemRow - step; i >= 0; i-- {
 			if s.selectableItems[i][s.selectedItemColumn] != nil {
 				s.selectedItemRow = i
 				didMove = true
+				break upOuter
 			} else {
 				for j := range len(s.selectableItems[i]) {
 					if s.selectableItems[i][j] != nil {
@@ -147,10 +162,11 @@ func (s *selector[T]) MoveCursor(direction cursorDirection) (T, int, int, bool) 
 		}
 	case down:
 	downOuter:
-		for i := s.selectedItemRow + 1; i < len(s.selectableItems); i++ {
+		for i := s.selectedItemRow + step; i < len(s.selectableItems); i++ {
 			if s.selectableItems[i][s.selectedItemColumn] != nil {
 				s.selectedItemRow = i
 				didMove = true
+				break downOuter
 
 			} else {
 				for j := range len(s.selectableItems[i]) {
@@ -164,7 +180,7 @@ func (s *selector[T]) MoveCursor(direction cursorDirection) (T, int, int, bool) 
 			}
 		}
 	case right:
-		for i := s.selectedItemColumn + 1; i < len(s.selectableItems[s.selectedItemRow]); i++ {
+		for i := s.selectedItemColumn + step; i < len(s.selectableItems[s.selectedItemRow]); i++ {
 			if s.selectableItems[s.selectedItemRow][i] != nil {
 				s.selectedItemColumn = i
 				didMove = true
@@ -172,7 +188,7 @@ func (s *selector[T]) MoveCursor(direction cursorDirection) (T, int, int, bool) 
 			}
 		}
 	case left:
-		for i := s.selectedItemColumn - 1; i >= 0; i-- {
+		for i := s.selectedItemColumn - step; i >= 0; i-- {
 			if s.selectableItems[s.selectedItemRow][i] != nil {
 				s.selectedItemColumn = i
 				didMove = true
@@ -195,6 +211,42 @@ func (s *selector[T]) AddSelectable(item T, row, col int) {
 
 func (s *selector[T]) GetSelected() (item *T, row, col int) {
 	item, row, col = s.selectableItems[s.selectedItemRow][s.selectedItemColumn], s.selectedItemRow, s.selectedItemColumn
+	return
+}
+
+func (s *selector[T]) SetSelected(row, col int) *T {
+	s.selectedItemRow = row
+	s.selectedItemColumn = col
+
+	return s.selectableItems[s.selectedItemRow][s.selectedItemColumn]
+}
+
+// SetSelectedInRange finds and sets the first selectable item within the range.
+//
+// startIndex is inclusive and endIndex is exclusive.
+func (s *selector[T]) SetSelectedInRange(startIndex, endIndex int) (item *T, row, col int, found bool) {
+	r, c, found := s.GetSelectedInRange(startIndex, endIndex)
+
+	if found {
+		s.selectedItemColumn = c
+		s.selectedItemRow = r
+	}
+
+	item, row, col = s.selectableItems[s.selectedItemRow][s.selectedItemColumn], s.selectedItemRow, s.selectedItemColumn
+	return
+}
+
+func (s *selector[T]) GetSelectedInRange(startIndex, endIndex int) (row, col int, found bool) {
+	for i := startIndex; i < endIndex; i++ {
+		for j := 0; j < len(s.selectableItems[i]); j++ {
+			if s.selectableItems[i][j] != nil {
+				col = j
+				row = i
+				found = true
+				return
+			}
+		}
+	}
 	return
 }
 
@@ -281,17 +333,28 @@ func WithKeyMap(km KeyMap) Option {
 	}
 }
 
+// Set the page size of the report card.
+func WithPageSize(pageSize int) Option {
+	return func(m *Model) {
+		m.pageSize = int(math.Max(float64(pageSize), 1))
+	}
+}
+
 func NewModel(options ...Option) Model {
 	m := Model{
 		nameColumnWidth: minNameLength,
 		activeTasks:     make(map[int]int),
 		KeyMap:          DefaultKeyMap(),
 		Help:            help.New(),
+		pageSize:        defaultPageSize,
 	}
 
 	for _, opt := range options {
 		opt(&m)
 	}
+
+	// Set the current page end index to the start index + page size unless there is only one page
+	m.pageCurrentEnd = int(math.Min(float64(m.pageCurrentStart+m.pageSize)-1, float64(len(m.rows)-1)))
 
 	m.selector = newSelector[TaskResultMsg](len(m.taskColumns), len(m.rows))
 
@@ -299,6 +362,8 @@ func NewModel(options ...Option) Model {
 	if m.spinner.ID() == 0 {
 		m.spinner = spinner.New()
 	}
+
+	m.inProgressCount = len(m.rows)
 
 	for k := range m.rows {
 		m.handleRemainingTasks(k, 0, false)
@@ -333,10 +398,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// get the width of the terminal
 		m.termWidth = msg.Width
 
-		// if m.showOutput {
-		// 	m.output.viewport.setWrappedLines(int(float64(m.termWidth) * 0.6))
-		// }
-
 	case tea.KeyMsg:
 		switch {
 		case key.Matches(msg, m.KeyMap.Quit):
@@ -346,44 +407,34 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.Help.ShowAll = !m.Help.ShowAll
 
 		case key.Matches(msg, m.KeyMap.ColLeft):
-			// If there is output to show, move left on the table.
-			item, _, _, didMove := m.selector.MoveCursor(left)
-			if didMove {
-				// Only update the content if the cursor actually moved.
-				m.output.SetContent(item.Output, int(float64(m.termWidth)*0.6))
-			}
+			m.MoveOne(left)
 
 		case key.Matches(msg, m.KeyMap.ColRight):
-			// If there is output to show, move right on the table.
-			item, _, _, didMove := m.selector.MoveCursor(right)
-			if didMove {
-				// Only update the content if the cursor actually moved.
-				m.output.SetContent(item.Output, int(float64(m.termWidth)*0.6))
-			}
+			m.MoveOne(right)
 
 		case key.Matches(msg, m.KeyMap.LineDown):
-			// If there is output to show, move down on the table.
-			item, _, _, didMove := m.selector.MoveCursor(down)
-			if didMove {
-				// Only update the content if the cursor actually moved.
-				m.output.SetContent(item.Output, int(float64(m.termWidth)*0.6))
-			}
+			m.MoveOne(down)
 
 		case key.Matches(msg, m.KeyMap.LineUp):
-			// If there is output to show, move down on the table.
-			item, _, _, didMove := m.selector.MoveCursor(up)
-			if didMove {
-				// Only update the content if the cursor actually moved.
-				m.output.SetContent(item.Output, int(float64(m.termWidth)*0.6))
-			}
+			m.MoveOne(up)
+
+		case key.Matches(msg, m.KeyMap.PageDownSummary):
+			m.PageDown()
+
+		case key.Matches(msg, m.KeyMap.PageUpSummary):
+			m.PageUp()
 
 		case key.Matches(msg, m.KeyMap.ShowOutput):
 			// If there is output to show, show/hide the output.
 			m.showOutput = !m.showOutput
 
 			if m.showOutput {
-				// m.output.viewport.setWrappedLines(int(float64(m.termWidth) * 0.6))
-				item, _, _ := m.selector.GetSelected()
+				item, row, _ := m.selector.GetSelected()
+
+				if row < m.pageCurrentStart || row > m.pageCurrentEnd {
+					item, _, _, _ = m.selector.SetSelectedInRange(m.pageCurrentStart, m.pageCurrentEnd+1)
+				}
+
 				m.output.SetContent(item.Output, int(float64(m.termWidth)*0.6))
 			}
 
@@ -457,6 +508,51 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, tea.Batch(cmds...)
 }
 
+func (m *Model) MoveOne(direction direction) {
+	// If there is output to show, move down on the table.
+	item, row, _, didMove := m.selector.MoveCursor(direction, 1)
+	if didMove {
+		// Only update the content if the cursor actually moved.
+		m.output.SetContent(item.Output, int(float64(m.termWidth)*0.6))
+
+		_, _, pageStart, pageEnd := GetPaginationDetails(len(m.rows), m.pageSize, row)
+		m.pageCurrentStart = pageStart
+		m.pageCurrentEnd = pageEnd
+	}
+}
+
+func (m *Model) PageDown() {
+	if m.pageCurrentEnd == len(m.rows)-1 {
+		return
+	}
+
+	_, _, pageStart, pageEnd := GetPaginationDetails(len(m.rows), m.pageSize, m.pageCurrentEnd+1)
+
+	m.pageCurrentEnd = pageEnd
+	m.pageCurrentStart = pageStart
+
+	if m.showOutput {
+		item := m.selector.SetSelected(m.pageCurrentStart, m.selector.selectedItemColumn)
+		m.output.SetContent(item.Output, int(float64(m.termWidth)*0.6))
+	}
+}
+
+func (m *Model) PageUp() {
+	if m.pageCurrentStart == 0 {
+		return
+	}
+
+	_, _, pageStart, pageEnd := GetPaginationDetails(len(m.rows), m.pageSize, m.pageCurrentStart-1)
+
+	m.pageCurrentStart = pageStart
+	m.pageCurrentEnd = pageEnd
+
+	if m.showOutput {
+		item := m.selector.SetSelected(m.pageCurrentStart, m.selector.selectedItemColumn)
+		m.output.SetContent(item.Output, int(float64(m.termWidth)*0.6))
+	}
+}
+
 // setCanShowOutput allows the user to toggle on/of the error/standard output for the tasks.
 func (m *Model) setCanShowOutput() {
 	m.canShowOutput = true
@@ -464,6 +560,10 @@ func (m *Model) setCanShowOutput() {
 }
 
 func (m *Model) updateAvailableKeys() {
+	_, _, found := m.selector.GetSelectedInRange(m.pageCurrentStart, m.pageCurrentEnd+1)
+
+	m.KeyMap.ShowOutput.SetEnabled(found)
+
 	if m.showOutput {
 		m.KeyMap.LineDown.SetEnabled(true)
 		m.KeyMap.LineUp.SetEnabled(true)
@@ -492,7 +592,7 @@ func (m *Model) updateAvailableKeys() {
 //   - i int 			(id/index of the item)
 //   - taskIndex int 	(index of the task from which to check onwards)
 //   - isFatal bool 	(bool indicating if the task failed fatally)
-func (m Model) handleRemainingTasks(i int, taskIndex int, isFatal bool) {
+func (m *Model) handleRemainingTasks(i int, taskIndex int, isFatal bool) {
 	var s bool
 	for k := taskIndex; k < len(m.rows[i].Tasks); k++ {
 		if m.rows[i].Tasks[k].Status == NotStarted {
@@ -508,6 +608,9 @@ func (m Model) handleRemainingTasks(i int, taskIndex int, isFatal bool) {
 				} else {
 					m.rows[i].Tasks[k].Status = Skip
 				}
+
+				m.rows[i].FinalStatus = Failure
+
 			} else {
 				m.rows[i].Tasks[k].Status = InProgress
 				s = true
@@ -517,22 +620,78 @@ func (m Model) handleRemainingTasks(i int, taskIndex int, isFatal bool) {
 	}
 
 	if !s {
+		// Row is done, there are no more tasks to run.
+
+		// Update the total counts for the different statuses.
+		switch m.rows[i].Tasks[taskIndex].Status {
+		case Failure:
+			m.failureCount++
+			m.inProgressCount--
+		case Success:
+			if m.rows[i].FinalStatus != Failure {
+				// Some tasks can run after a previous task fails fatally.
+				// This makes sure that the final result for the row is shown
+				// correctly.
+				m.successCount++
+			} else {
+				m.failureCount++
+			}
+
+			m.inProgressCount--
+		}
+
 		delete(m.activeTasks, i)
 	}
 }
 
 func (m Model) View() string {
+	// length of rows includes the header
 	rows := make([]string, 0, len(m.rows)+1)
 	rows = append(rows, m.headerView())
-	for i := range m.rows {
+	for i := m.pageCurrentStart; i <= m.pageCurrentEnd; i++ {
 		rows = append(rows, m.renderRow(i))
 	}
 
-	summary := m.styles.Border.Render(lipgloss.JoinVertical(lipgloss.Top, rows...))
+	summaryTableRendered := lipgloss.JoinVertical(lipgloss.Top, rows...)
+
+	pageCountsRendered := m.renderPageCounts()
+	totalCountsRendered := m.renderTotalCounts()
+
+	// Calculate the the space between the page count (left-aligned) and the total count (right-aligned)
+	spaceBetween := lipgloss.Width(summaryTableRendered) - lipgloss.Width(totalCountsRendered) - lipgloss.Width(pageCountsRendered)
+
+	var metaDataRendered string
+
+	// If the spaceBetween the left-aligned and the right-aligned content is too little, display them underneath each other.
+	// (5 is an arbitrary number in this case)
+	if spaceBetween <= 5 {
+		metaDataRendered = pageCountsRendered + "\n" + lipgloss.NewStyle().PaddingLeft(m.styles.NameHeader.GetPaddingLeft()).Render(totalCountsRendered)
+	} else {
+		metaDataRendered = pageCountsRendered + strings.Repeat(" ", spaceBetween) + lipgloss.NewStyle().PaddingRight(m.styles.NameHeader.GetPaddingRight()).Render(totalCountsRendered)
+	}
+
+	summary := m.styles.Border.Render(lipgloss.JoinVertical(lipgloss.Left, summaryTableRendered, metaDataRendered))
+
+	// If there is more than one page, render the "scroll bar"
+	if m.pageSize != len(m.rows) {
+		summary = lipgloss.JoinHorizontal(
+			lipgloss.Center,
+			summary,
+			renderPageScrollBar(m.pageCurrentStart, m.pageCurrentEnd, len(m.rows), m.Help.Styles.FullDesc, m.Help.Styles.FullKey, m.KeyMap.PageUpSummary.Keys()[0], m.KeyMap.PageDownSummary.Keys()[0]),
+		)
+	}
 
 	var output string
 	if m.showOutput {
 		output = m.styles.Border.Render(fmt.Sprintf("%s\n\n", lipgloss.NewStyle().Bold(true).Render("Output")) + m.output.View())
+
+		if m.output.viewport.VisibleLineCount() < m.output.viewport.TotalLineCount() {
+			output = lipgloss.JoinHorizontal(
+				lipgloss.Center,
+				output,
+				m.renderOutputScrollBar(m.Help.Styles.FullDesc, m.Help.Styles.FullKey),
+			)
+		}
 	}
 	return lipgloss.JoinVertical(lipgloss.Left, summary, output) + "\n" + m.Help.View(m.KeyMap)
 }
@@ -636,17 +795,99 @@ func (m Model) renderTaskColumn(status TaskStatus, style lipgloss.Style, index, 
 	return r
 }
 
+func (m Model) renderTotalCounts() string {
+	var s string
+
+	isFailureCount, isInProgressCount, isSuccessCount := m.failureCount > 0, m.inProgressCount > 0, m.successCount > 0
+
+	if isFailureCount {
+		s += "✗ " + strconv.Itoa(m.failureCount)
+
+		if isInProgressCount || isSuccessCount {
+			s += ", "
+		}
+	}
+
+	if isInProgressCount {
+		s += "⣯ " + strconv.Itoa(m.inProgressCount)
+
+		if isSuccessCount {
+			s += ", "
+		}
+	}
+
+	if isSuccessCount {
+		s += "✓ " + strconv.Itoa(m.successCount)
+	}
+
+	return lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{
+		Light: "#909090",
+		Dark:  "#626262",
+	}).Render(fmt.Sprintf("total: (%s) / %d", s, len(m.rows)))
+}
+
+func (m Model) renderPageCounts() string {
+	numPages, currPage, _, _ := GetPaginationDetails(len(m.rows), m.pageSize, m.pageCurrentStart)
+
+	return lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{
+		Light: "#909090",
+		Dark:  "#626262",
+	}).PaddingLeft(m.styles.NameHeader.GetPaddingLeft()).Render(fmt.Sprintf("page: %d of %d", currPage+1, numPages))
+}
+
+func renderPageScrollBar(pageStart, pageEnd, totalElements int, arrowStyle, keyStyle lipgloss.Style, pageUpKey, pageDownKey string) string {
+	var s string
+
+	if pageStart != 0 {
+		s += arrowStyle.Render("↟") + " " + keyStyle.Render(pageUpKey)
+
+	} else {
+		s += arrowStyle.Render("┬")
+	}
+
+	s += "\n"
+
+	if pageEnd != totalElements-1 {
+		s += arrowStyle.Render("↡") + " " + keyStyle.Render(pageDownKey)
+	} else {
+		s += arrowStyle.Render("┴")
+	}
+
+	return s
+}
+
+func (m Model) renderOutputScrollBar(arrowStyle, keyStyle lipgloss.Style) string {
+	var s string
+	if m.output.viewport.YOffset == 0 {
+		s += arrowStyle.Render("┬")
+	} else {
+		s += arrowStyle.Render("↟") + " " + keyStyle.Render(strings.Join(m.KeyMap.PageUp.Keys(), ",")) + "\n"
+		s += arrowStyle.Render("↑") + " " + keyStyle.Render(strings.Join(m.KeyMap.Up.Keys(), ","))
+	}
+
+	s += "\n"
+
+	if m.output.viewport.YOffset+1 > m.output.viewport.TotalLineCount()-m.output.viewport.VisibleLineCount() {
+		s += arrowStyle.Render("┴")
+	} else {
+		s += arrowStyle.Render("↓") + " " + keyStyle.Render(strings.Join(m.KeyMap.Down.Keys(), ",")) + "\n"
+		s += arrowStyle.Render("↡") + " " + keyStyle.Render(strings.Join(m.KeyMap.PageDown.Keys(), ","))
+	}
+
+	return s
+}
+
 // ShortHelp implements the KeyMap interface.
 func (km KeyMap) ShortHelp() []key.Binding {
-	return []key.Binding{km.Quit, km.Help, km.ShowOutput, km.LineUp, km.LineDown, km.ColLeft, km.ColRight, km.Down, km.Up}
+	return []key.Binding{km.Quit, km.Help, km.ShowOutput, km.LineUp, km.LineDown, km.ColLeft, km.ColRight}
 }
 
 // FullHelp implements the KeyMap interface.
 func (km KeyMap) FullHelp() [][]key.Binding {
 	return [][]key.Binding{
 		{km.Quit, km.Help, km.ShowOutput, km.LineUp, km.LineDown},
-		{km.Down, km.Up, km.HalfPageDown, km.HalfPageUp, km.LineUp},
-		{km.LineDown, km.ColLeft, km.ColRight, km.PageUp, km.PageDown},
+		{km.Down, km.Up, km.HalfPageDown, km.HalfPageUp, km.PageDownSummary},
+		{km.PageUpSummary, km.ColLeft, km.ColRight, km.PageUp, km.PageDown},
 	}
 }
 
@@ -671,6 +912,14 @@ func DefaultKeyMap() KeyMap {
 			key.WithHelp("↓", "down"),
 			key.WithDisabled(),
 		),
+		PageDownSummary: key.NewBinding(
+			key.WithKeys("g"),
+			key.WithHelp("g", "page down"),
+		),
+		PageUpSummary: key.NewBinding(
+			key.WithKeys("t"),
+			key.WithHelp("t", "page down"),
+		),
 		ColLeft: key.NewBinding(
 			key.WithKeys("left"),
 			key.WithHelp("←", "left"),
@@ -683,11 +932,12 @@ func DefaultKeyMap() KeyMap {
 		),
 		ShowOutput: key.NewBinding(
 			key.WithKeys("s"),
-			key.WithHelp("s", "show logs"),
+			key.WithHelp("s", "toggle logs"),
 			key.WithDisabled(),
 		),
 		PageDown: key.NewBinding(
-			key.WithKeys("pgdown", spacebar, "f"),
+			// key.WithKeys("pgdown", spacebar, "f"),
+			key.WithKeys("pgdown", "f"),
 			key.WithHelp("f/pgdn", "page down"),
 		),
 		PageUp: key.NewBinding(
@@ -713,4 +963,12 @@ func DefaultKeyMap() KeyMap {
 			key.WithDisabled(),
 		),
 	}
+}
+
+func GetPaginationDetails(totalElements, elementsPerPage, currentElementIndex int) (numPages int, currentPage int, pageStartIndex int, pageEndIndex int) {
+	numPages = int(math.Ceil(float64(totalElements) / float64(elementsPerPage)))
+	pageStartIndex = (currentElementIndex / elementsPerPage) * elementsPerPage
+	pageEndIndex = int(math.Min(float64(pageStartIndex+elementsPerPage-1), float64(totalElements-1)))
+	currentPage = int(math.Ceil(float64(pageStartIndex) / float64(elementsPerPage)))
+	return
 }

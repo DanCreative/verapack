@@ -8,7 +8,9 @@ import (
 )
 
 var (
-	Version string
+	Version        string
+	UpdateApp      func(*cli.App)
+	VersionPrinter func(cCtx *cli.Context)
 )
 
 func main() {
@@ -18,10 +20,17 @@ func main() {
 		}
 	}
 
-	cli.VersionPrinter = verapack.VersionPrinter
+	if VersionPrinter == nil {
+		VersionPrinter = verapack.VersionPrinter
+	}
+	cli.VersionPrinter = VersionPrinter
 
 	app := verapack.NewApp()
 	app.Version = Version
+
+	if UpdateApp != nil {
+		UpdateApp(app)
+	}
 
 	err := app.Run(os.Args)
 	check(err)
