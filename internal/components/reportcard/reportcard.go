@@ -673,7 +673,7 @@ func (m Model) View() string {
 	summary := m.styles.Border.Render(lipgloss.JoinVertical(lipgloss.Left, summaryTableRendered, metaDataRendered))
 
 	// If there is more than one page, render the "scroll bar"
-	if m.pageSize != len(m.rows) {
+	if len(m.rows) > m.pageSize {
 		summary = lipgloss.JoinHorizontal(
 			lipgloss.Center,
 			summary,

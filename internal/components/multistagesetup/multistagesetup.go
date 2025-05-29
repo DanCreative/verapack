@@ -2,6 +2,7 @@ package multistagesetup
 
 import (
 	"fmt"
+	"maps"
 
 	"github.com/charmbracelet/bubbles/help"
 	"github.com/charmbracelet/bubbles/key"
@@ -31,22 +32,23 @@ type TaskResult struct {
 	Status SetupTaskStatus
 	Err    error
 	Msg    string
+	Values map[string]any
 }
 
-func NewFailedTaskResult(msg string, err error) TaskResult {
-	return TaskResult{Status: SetupTaskFailure, Msg: msg, Err: err}
+func NewFailedTaskResult(msg string, err error, values map[string]any) TaskResult {
+	return TaskResult{Status: SetupTaskFailure, Msg: msg, Err: err, Values: values}
 }
 
-func NewSuccessfulTaskResult(msg string) TaskResult {
-	return TaskResult{Status: SetupTaskSuccess, Msg: msg}
+func NewSuccessfulTaskResult(msg string, values map[string]any) TaskResult {
+	return TaskResult{Status: SetupTaskSuccess, Msg: msg, Values: values}
 }
 
-func NewSkippedTaskResult(msg string) TaskResult {
-	return TaskResult{Status: SetupTaskSkipped, Msg: msg}
+func NewSkippedTaskResult(msg string, values map[string]any) TaskResult {
+	return TaskResult{Status: SetupTaskSkipped, Msg: msg, Values: values}
 }
 
-func NewWarningTaskResult(msg string) TaskResult {
-	return TaskResult{Status: SetupTaskWarning, Msg: msg}
+func NewWarningTaskResult(msg string, values map[string]any) TaskResult {
+	return TaskResult{Status: SetupTaskWarning, Msg: msg, Values: values}
 }
 
 // SetupTask wraps the teaTasker and contains any data that the setupModel will use.
@@ -72,6 +74,10 @@ type TeaTasker interface {
 
 	// GetHelp returns any help instructions specific to that task.
 	GetHelp() help.KeyMap
+
+	// NewWithValues is a way for the Model to inject values into the
+	// children tea Models. Using pointers over-complicates the interface.
+	NewWithValues(values map[string]any) TeaTasker
 }
 
 type KeyMap struct {
@@ -142,6 +148,7 @@ type Model struct {
 	termWidth          int
 	finalMessage       string
 	isSuccessfullyDone bool
+	values             map[string]any
 }
 
 // Init sets the first task's status to in progress, runs the first task's Init method and starts the spinner
@@ -164,6 +171,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msgt := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.termWidth = msgt.Width
+
 	case tea.KeyMsg:
 		// If key is disabled, Matches() will return false
 		switch {
@@ -181,6 +189,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case TaskResult:
 		m.tasks[m.activeTask].msg = msgt.Msg
+
+		// If the task returns any outputs, add them to the Model's values map
+		if msgt.Values != nil {
+			maps.Copy(m.values, msgt.Values)
+		}
+
 		switch msgt.Status {
 		case SetupTaskSuccess, SetupTaskWarning, SetupTaskSkipped:
 			m.tasks[m.activeTask].status = msgt.Status
@@ -213,6 +227,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	if newTask {
 		// if this is the first time this task is run, run the Init() method
+
+		if len(m.values) > 0 {
+			m.tasks[m.activeTask].task = m.tasks[m.activeTask].task.NewWithValues(m.values)
+		}
+
 		cmds[0] = m.tasks[m.activeTask].task.Init()
 	} else {
 		// Otherwise, run the normal Update() method
@@ -312,6 +331,7 @@ func NewModel(options ...Option) Model {
 	m := Model{
 		KeyMap: DefaultKeyMap(),
 		Help:   help.New(),
+		values: make(map[string]any),
 	}
 
 	for _, opt := range options {

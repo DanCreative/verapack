@@ -3,10 +3,12 @@ package verapack
 import (
 	"errors"
 	"fmt"
+	"os"
 	"reflect"
 
 	"github.com/DanCreative/veracode-go/veracode"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/x/term"
 	"github.com/go-playground/validator/v10"
 )
 
@@ -31,6 +33,13 @@ func NewVeraPackError(message, application, task string) *VeraPackError {
 }
 
 func renderErrors(errs ...error) string {
+	width, _, err := term.GetSize(os.Stdout.Fd())
+	if err != nil {
+		width = 500
+	}
+
+	width = int(float64(width) * 0.6)
+
 	return lipgloss.NewStyle().
 		PaddingLeft(1).
 		PaddingRight(1).
@@ -42,12 +51,19 @@ func renderErrors(errs ...error) string {
 			lipgloss.NewStyle().
 				Padding(0, 0, 1, 0).
 				AlignHorizontal(lipgloss.Center).
-				Underline(true).Render("Errors")+"\n"+rawRenderErrors(errs...),
+				Underline(true).Render("Errors")+"\n"+rawRenderErrors(width, errs...),
 		) + "\n"
 }
 
-func rawRenderErrors(errs ...error) string {
+// rawRenderErrors handles custom error messages and renders the errors as a bullet point list where
+// the points are red crosses.
+//
+// width sets the max width that the error message can be.
+func rawRenderErrors(width int, errs ...error) string {
 	var r string
+
+	// Adjust the width for the bullet point: "✗  "
+	msgStyle := lipgloss.NewStyle().Width(width - 3)
 
 	for k, err := range errs {
 		var validateErrs validator.ValidationErrors
@@ -87,7 +103,10 @@ func rawRenderErrors(errs ...error) string {
 					msg = fmt.Sprintf("config validation error at %s: unspecified error with field, tag=%s,param=%s", e.Namespace(), e.Tag(), e.Param())
 				}
 
-				r += redForeground.Render("✗") + "  " + msg
+				msg = msgStyle.Render(msg)
+				r += lipgloss.JoinHorizontal(lipgloss.Top, redForeground.Render("✗"+"  "), msg)
+
+				// r += redForeground.Render("✗") + "  " + msg
 
 				if j != len(validateErrs)-1 || (len(errs) > 1 && k != len(errs)-1) {
 					// Can add a new line if not the last validation error
@@ -106,13 +125,15 @@ func rawRenderErrors(errs ...error) string {
 				msg = err.Error()
 			}
 
-			r += redForeground.Render("✗") + "  " + msg
+			msg = msgStyle.Render(msg)
+			r += lipgloss.JoinHorizontal(lipgloss.Top, redForeground.Render("✗")+"  ", msg)
+
 			if k != len(errs)-1 {
 				r += "\n"
 			}
 
 		} else {
-			r += redForeground.Render("✗") + "  " + err.Error()
+			r += lipgloss.JoinHorizontal(lipgloss.Top, redForeground.Render("✗")+"  ", msgStyle.Render(err.Error()))
 			if k != len(errs)-1 {
 				r += "\n"
 			}
