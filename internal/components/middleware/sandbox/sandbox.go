@@ -31,7 +31,7 @@ type Styles struct {
 // Model mutates the provided []Options and adds the found/created sandbox ids to it.
 type Model struct {
 	spinner        spinner.Model
-	errRenderFunc  func(...error) string
+	errRenderFunc  func(width int, errs ...error) string
 	size           tea.WindowSizeMsg
 	postFunc       PostFunc
 	styles         Styles
@@ -208,7 +208,7 @@ func (m Model) View() string {
 	}
 
 	if errCount := len(m.errs); errCount > 0 {
-		s += m.styles.Counts.Render(fmt.Sprintf("   errors: %d", errCount)) + "\n" + lipgloss.NewStyle().MarginLeft(3).Render(m.errRenderFunc(m.errs...))
+		s += m.styles.Counts.Render(fmt.Sprintf("   errors: %d", errCount)) + "\n" + lipgloss.NewStyle().MarginLeft(3).Render(m.errRenderFunc(int(float64(m.size.Width)*0.6), m.errs...))
 	}
 
 	return m.styles.Border.Render(s) + "\n"
@@ -249,7 +249,7 @@ func WithPostFunc(postFunc PostFunc) Option {
 	}
 }
 
-func WithErrorRenderFunc(errRenderFunc func(...error) string) Option {
+func WithErrorRenderFunc(errRenderFunc func(width int, errs ...error) string) Option {
 	return func(m *Model) {
 		m.errRenderFunc = errRenderFunc
 	}

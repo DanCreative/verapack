@@ -218,10 +218,10 @@ func (m CredentialsConfigureModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.state == 0 && m.CredentialsTask.isInputDone {
 			return m, tea.Batch(
 				func() tea.Msg {
-					return struct{ err error }{err: setCredentialsFile(m.homeDir, *m.apiKey, *m.apiSecret)}
+					return struct{ err error }{err: setCredentialsFile(m.homeDir, m.apiKey, m.apiSecret)}
 				},
 				func() tea.Msg {
-					return struct{ err error }{err: setLegacyCredentialsFile(m.homeDir, *m.apiKey, *m.apiSecret)}
+					return struct{ err error }{err: setLegacyCredentialsFile(m.homeDir, m.apiKey, m.apiSecret)}
 				},
 			)
 		}

@@ -2,6 +2,7 @@ package verapack
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -11,6 +12,7 @@ import (
 	"os/exec"
 	"path/filepath"
 
+	"github.com/DanCreative/veracode-go/veracode"
 	"github.com/DanCreative/verapack/internal/components/multistagesetup"
 	"github.com/charmbracelet/bubbles/help"
 	"github.com/charmbracelet/bubbles/key"
@@ -21,11 +23,14 @@ import (
 
 var _ multistagesetup.TeaTasker = SimpleTask{}
 var _ multistagesetup.TeaTasker = CredentialsTask{}
+var _ multistagesetup.TeaTasker = PrerequisiteTask{}
 
 // ===================================================================== TeaTaskers =====================================================================================
 
 type SimpleTask struct {
-	f tea.Cmd // tea function that will be run
+	f      func(values map[string]any) tea.Cmd
+	values map[string]any
+	// f tea.Cmd // tea function that will be run
 }
 
 func (s SimpleTask) GetHelp() help.KeyMap {
@@ -33,7 +38,7 @@ func (s SimpleTask) GetHelp() help.KeyMap {
 }
 
 func (s SimpleTask) Init() tea.Cmd {
-	return s.f
+	return s.f(s.values)
 }
 
 func (s SimpleTask) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -44,7 +49,12 @@ func (s SimpleTask) View() string {
 	return ""
 }
 
-func NewSimpleTask(f tea.Cmd) SimpleTask {
+func (s SimpleTask) NewWithValues(values map[string]any) multistagesetup.TeaTasker {
+	s.values = values
+	return s
+}
+
+func NewSimpleTask(f func(values map[string]any) tea.Cmd) SimpleTask {
 	return SimpleTask{
 		f: f,
 	}
@@ -74,11 +84,11 @@ func (s PrerequisiteTask) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch {
 		case key.Matches(msg, s.acknowledgeKey):
 			// This case will only be possible if there are warnings.
-			return s, func() tea.Msg { return multistagesetup.NewWarningTaskResult("") }
+			return s, func() tea.Msg { return multistagesetup.NewWarningTaskResult("", nil) }
 		}
 	case PrerequisiteTaskResult:
 		if len(msg.warnings) < 1 {
-			return s, func() tea.Msg { return multistagesetup.NewSuccessfulTaskResult("") }
+			return s, func() tea.Msg { return multistagesetup.NewSuccessfulTaskResult("", nil) }
 		}
 		s.result = msg
 	}
@@ -96,6 +106,10 @@ func (s PrerequisiteTask) View() string {
 	}
 
 	return r
+}
+
+func (s PrerequisiteTask) NewWithValues(values map[string]any) multistagesetup.TeaTasker {
+	return s
 }
 
 func (s PrerequisiteTask) ShortHelp() []key.Binding {
@@ -123,9 +137,7 @@ type CredentialsTask struct {
 	keys              CredentialsFormKeyMap
 	focused           int
 	isInputDone       bool
-	apiKey, apiSecret *string
-	preFunc           tea.Cmd
-	postFunc          tea.Cmd
+	apiKey, apiSecret string
 }
 
 func (m *CredentialsTask) updateHelp() {
@@ -165,7 +177,19 @@ func (m *CredentialsTask) prevInput() {
 }
 
 func (m CredentialsTask) Init() tea.Cmd {
-	return tea.Batch(textinput.Blink, m.preFunc)
+	return tea.Batch(textinput.Blink, func() tea.Msg {
+		apiKey, apiSecret, err := veracode.LoadVeracodeCredentials()
+		if err == nil {
+			m.apiKey, m.apiSecret = apiKey, apiSecret
+			return multistagesetup.NewSkippedTaskResult("already setup", map[string]any{"apiKey": apiKey, "apiSecret": apiSecret})
+		}
+
+		return nil
+	})
+}
+
+func (m CredentialsTask) NewWithValues(values map[string]any) multistagesetup.TeaTasker {
+	return m
 }
 
 func (m CredentialsTask) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -177,9 +201,11 @@ func (m CredentialsTask) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case key.Matches(msg, m.keys.Submit):
 			if m.focused == len(m.inputs)-1 {
 				m.isInputDone = true
-				*m.apiKey = m.inputs[0].Value()
-				*m.apiSecret = m.inputs[1].Value()
-				return m, m.postFunc
+				m.apiKey = m.inputs[0].Value()
+				m.apiSecret = m.inputs[1].Value()
+				return m, func() tea.Msg {
+					return multistagesetup.NewSuccessfulTaskResult("", map[string]any{"apiKey": m.apiKey, "apiSecret": m.apiSecret})
+				}
 			} else {
 				m.nextInput()
 			}
@@ -244,7 +270,7 @@ func (k CredentialsFormKeyMap) FullHelp() [][]key.Binding {
 	return nil
 }
 
-func NewCredentialsTask(apiKey, apiSecret *string, preFunc, postFunc tea.Cmd) CredentialsTask {
+func NewCredentialsTask() CredentialsTask {
 	inputs := make([]textinput.Model, 2)
 	inputs[0] = textinput.New()
 	inputs[0].Focus()
@@ -256,11 +282,7 @@ func NewCredentialsTask(apiKey, apiSecret *string, preFunc, postFunc tea.Cmd) Cr
 	inputs[1].Prompt = ""
 
 	return CredentialsTask{
-		inputs:    inputs,
-		apiKey:    apiKey,
-		apiSecret: apiSecret,
-		preFunc:   preFunc,
-		postFunc:  postFunc,
+		inputs: inputs,
 		keys: CredentialsFormKeyMap{
 			Next: key.NewBinding(
 				key.WithHelp("tab/enter", "next"),
@@ -284,177 +306,201 @@ func NewCredentialsTask(apiKey, apiSecret *string, preFunc, postFunc tea.Cmd) Cr
 // Tasks
 func SetupConfig(homeDir, appDir string) multistagesetup.SetupTask {
 	return multistagesetup.NewSetupTask("Set up initial config template", NewSimpleTask(
-		func() tea.Msg {
-			var err error
+		func(values map[string]any) tea.Cmd {
+			return func() tea.Msg {
+				var err error
 
-			_, err = os.Stat(filepath.Join(appDir, "config.yaml"))
-			if err == nil {
-				return multistagesetup.NewSkippedTaskResult("already setup")
+				_, err = os.Stat(filepath.Join(appDir, "config.yaml"))
+				if err == nil {
+					return multistagesetup.NewSkippedTaskResult("already setup", nil)
+				}
+
+				if err = os.MkdirAll(appDir, 0600); err != nil {
+					return multistagesetup.NewFailedTaskResult("", err, nil)
+				}
+
+				file, err := os.Create(filepath.Join(appDir, "config.yaml"))
+				if err != nil {
+					return multistagesetup.NewFailedTaskResult("", err, nil)
+				}
+
+				defer file.Close()
+
+				_, err = io.Copy(file, bytes.NewReader(configFileBytes))
+				if err != nil {
+					return multistagesetup.NewFailedTaskResult("", err, nil)
+				}
+
+				return multistagesetup.NewSuccessfulTaskResult("", nil)
 			}
-
-			if err = os.MkdirAll(appDir, 0600); err != nil {
-				return multistagesetup.NewFailedTaskResult("", err)
-			}
-
-			file, err := os.Create(filepath.Join(appDir, "config.yaml"))
-			if err != nil {
-				return multistagesetup.NewFailedTaskResult("", err)
-			}
-
-			defer file.Close()
-
-			_, err = io.Copy(file, bytes.NewReader(configFileBytes))
-			if err != nil {
-				return multistagesetup.NewFailedTaskResult("", err)
-			}
-
-			return multistagesetup.NewSuccessfulTaskResult("")
 		},
 	))
 }
 
-func SetupCredentials(homeDir string) []multistagesetup.SetupTask {
-	var apiKey, apiSecret string
-	return []multistagesetup.SetupTask{
-		multistagesetup.NewSetupTask("User generate and enter credentials", NewCredentialsTask(&apiKey, &apiSecret, func() tea.Msg {
-			_, cerr := os.Stat(filepath.Join(homeDir, ".veracode", "veracode.yml"))
-			_, lerr := os.Stat(filepath.Join(homeDir, ".veracode", "credentials"))
-			if cerr == nil && lerr == nil {
-				return multistagesetup.NewSkippedTaskResult("already setup")
-			}
-			return nil
-		}, func() tea.Msg {
-			return multistagesetup.NewSuccessfulTaskResult("")
-		})),
-		multistagesetup.NewSetupTask("Create credential file", NewSimpleTask(func() tea.Msg {
+func SetupCredentialsUserPrompt(homeDir string) multistagesetup.SetupTask {
+	return multistagesetup.NewSetupTask("User generate and enter credentials", NewCredentialsTask())
+}
+
+func SetupCredentialsFile(homeDir string) multistagesetup.SetupTask {
+	return multistagesetup.NewSetupTask("Create credential file", NewSimpleTask(func(values map[string]any) tea.Cmd {
+		return func() tea.Msg {
 			var err error
 			if _, err = os.Stat(filepath.Join(homeDir, ".veracode", "veracode.yml")); err == nil {
-				return multistagesetup.NewSkippedTaskResult("already setup")
+				return multistagesetup.NewSkippedTaskResult("already setup", nil)
+			}
+
+			apiKey, okKey := values["apiKey"].(string)
+			apiSecret, okSecret := values["apiSecret"].(string)
+
+			if !okKey || !okSecret {
+				return multistagesetup.NewFailedTaskResult("", errors.New("api key and/or secret not set"), nil)
 			}
 
 			err = setCredentialsFile(homeDir, apiKey, apiSecret)
 			if err != nil {
-				return multistagesetup.NewFailedTaskResult("", err)
+				return multistagesetup.NewFailedTaskResult("", err, nil)
 			}
 
-			return multistagesetup.NewSuccessfulTaskResult("")
-		})),
-		multistagesetup.NewSetupTask("Create legacy credential file", NewSimpleTask(func() tea.Msg {
+			return multistagesetup.NewSuccessfulTaskResult("", nil)
+		}
+	}))
+}
+
+func SetupCredentialsFileLegacy(homeDir string) multistagesetup.SetupTask {
+	return multistagesetup.NewSetupTask("Create legacy credential file", NewSimpleTask(func(values map[string]any) tea.Cmd {
+		return func() tea.Msg {
 			var err error
 			if _, err = os.Stat(filepath.Join(homeDir, ".veracode", "credentials")); err == nil {
-				return multistagesetup.NewSkippedTaskResult("already setup")
+				return multistagesetup.NewSkippedTaskResult("already setup", nil)
+			}
+
+			apiKey, okKey := values["apiKey"].(string)
+			apiSecret, okSecret := values["apiSecret"].(string)
+
+			if !okKey || !okSecret {
+				return multistagesetup.NewFailedTaskResult("", errors.New("api key and/or secret not set"), nil)
 			}
 
 			err = setLegacyCredentialsFile(homeDir, apiKey, apiSecret)
 			if err != nil {
-				return multistagesetup.NewFailedTaskResult("", err)
+				return multistagesetup.NewFailedTaskResult("", err, nil)
 			}
 
-			return multistagesetup.NewSuccessfulTaskResult("")
-		})),
-	}
+			return multistagesetup.NewSuccessfulTaskResult("", nil)
+		}
+	}))
 }
 
-func InstallDependencyPackager() multistagesetup.SetupTask {
-	return multistagesetup.NewSetupTask("Install Veracode CLI", NewSimpleTask(func() tea.Msg {
-		packagerPath := getPackagerLocation()
+func SetupInstallDependencyPackager() multistagesetup.SetupTask {
+	return multistagesetup.NewSetupTask("Install Veracode CLI", NewSimpleTask(func(values map[string]any) tea.Cmd {
+		return func() tea.Msg {
+			packagerPath := getPackagerLocation()
 
-		var err error
+			var err error
 
-		if _, err = os.Stat(packagerPath); err == nil {
-			localVersion := GetLocalVersion(filepath.Join(packagerPath, "VERSION"))
-			return multistagesetup.NewSkippedTaskResult("already installed version: " + localVersion)
+			if _, err = os.Stat(packagerPath); err == nil {
+				localVersion := GetLocalVersion(filepath.Join(packagerPath, "VERSION"))
+				return multistagesetup.NewSkippedTaskResult("already installed version: "+localVersion, nil)
+			}
+
+			version, err := InstallPackager(false, packagerPath)
+			if err != nil {
+				return multistagesetup.NewFailedTaskResult("", err, nil)
+			}
+
+			return multistagesetup.NewSuccessfulTaskResult("successfully installed version: "+version, nil)
 		}
-
-		version, err := InstallPackager(false, packagerPath)
-		if err != nil {
-			return multistagesetup.NewFailedTaskResult("", err)
-		}
-
-		return multistagesetup.NewSuccessfulTaskResult("successfully installed version: " + version)
 	}))
 }
 
 func UpdateDependencyPackager() multistagesetup.SetupTask {
-	return multistagesetup.NewSetupTask("Update Veracode CLI", NewSimpleTask(func() tea.Msg {
-		packagerPath := getPackagerLocation()
-		packagerCurrentVersion := GetLocalVersion(filepath.Join(getPackagerLocation(), "VERSION"))
+	return multistagesetup.NewSetupTask("Update Veracode CLI", NewSimpleTask(func(values map[string]any) tea.Cmd {
+		return func() tea.Msg {
+			packagerPath := getPackagerLocation()
+			packagerCurrentVersion := GetLocalVersion(filepath.Join(getPackagerLocation(), "VERSION"))
 
-		jar, _ := cookiejar.New(&cookiejar.Options{})
-		client := &http.Client{
-			Jar: jar,
+			jar, _ := cookiejar.New(&cookiejar.Options{})
+			client := &http.Client{
+				Jar: jar,
+			}
+			baseURL, _ := url.Parse("https://tools.veracode.com/veracode-cli")
+
+			fileVersion, _ := GetLatestPackagerVersion(client, baseURL)
+
+			if fileVersion == packagerCurrentVersion {
+				return multistagesetup.NewSkippedTaskResult("already on the latest version: "+fileVersion, nil)
+			}
+
+			version, err := InstallPackager(false, packagerPath)
+			if err != nil {
+				return multistagesetup.NewFailedTaskResult("", err, nil)
+			}
+
+			return multistagesetup.NewSuccessfulTaskResult(fmt.Sprintf("successfully updated: %s -> %s", packagerCurrentVersion, version), nil)
 		}
-		baseURL, _ := url.Parse("https://tools.veracode.com/veracode-cli")
-
-		fileVersion, _ := GetLatestPackagerVersion(client, baseURL)
-
-		if fileVersion == packagerCurrentVersion {
-			return multistagesetup.NewSkippedTaskResult("already on the latest version: " + fileVersion)
-		}
-
-		version, err := InstallPackager(false, packagerPath)
-		if err != nil {
-			return multistagesetup.NewFailedTaskResult("", err)
-		}
-
-		return multistagesetup.NewSuccessfulTaskResult(fmt.Sprintf("successfully updated: %s -> %s", packagerCurrentVersion, version))
 	}))
 }
 
-func InstallDependencyWrapper() multistagesetup.SetupTask {
-	return multistagesetup.NewSetupTask("Install Veracode Uploader", NewSimpleTask(func() tea.Msg {
-		wrapperPath := getWrapperLocation()
+func SetupInstallDependencyWrapper() multistagesetup.SetupTask {
+	return multistagesetup.NewSetupTask("Install Veracode Uploader", NewSimpleTask(func(values map[string]any) tea.Cmd {
+		return func() tea.Msg {
+			wrapperPath := getWrapperLocation()
 
-		var err error
+			var err error
 
-		if _, err = os.Stat(filepath.Join(wrapperPath, "VeracodeJavaAPI.jar")); err == nil {
-			localVersion := GetLocalVersion(filepath.Join(wrapperPath, "VERSION"))
-			return multistagesetup.NewSkippedTaskResult("already installed version: " + localVersion)
+			if _, err = os.Stat(filepath.Join(wrapperPath, "VeracodeJavaAPI.jar")); err == nil {
+				localVersion := GetLocalVersion(filepath.Join(wrapperPath, "VERSION"))
+				return multistagesetup.NewSkippedTaskResult("already installed version: "+localVersion, nil)
+			}
+
+			version, err := InstallUploader(wrapperPath)
+			if err != nil {
+				return multistagesetup.NewFailedTaskResult("", err, nil)
+			}
+
+			return multistagesetup.NewSuccessfulTaskResult("successfully installed version: "+version, nil)
 		}
-
-		version, err := InstallUploader(wrapperPath)
-		if err != nil {
-			return multistagesetup.NewFailedTaskResult("", err)
-		}
-
-		return multistagesetup.NewSuccessfulTaskResult("successfully installed version: " + version)
 	}))
 }
 
 func UpdateDependencyWrapper() multistagesetup.SetupTask {
-	return multistagesetup.NewSetupTask("Update Veracode Uploader", NewSimpleTask(func() tea.Msg {
-		wrapperPath := getWrapperLocation()
-		wrapperCurrentVersion := GetLocalVersion(filepath.Join(wrapperPath, "VERSION"))
+	return multistagesetup.NewSetupTask("Update Veracode Uploader", NewSimpleTask(func(values map[string]any) tea.Cmd {
+		return func() tea.Msg {
+			wrapperPath := getWrapperLocation()
+			wrapperCurrentVersion := GetLocalVersion(filepath.Join(wrapperPath, "VERSION"))
 
-		jar, _ := cookiejar.New(&cookiejar.Options{})
-		client := &http.Client{
-			Jar: jar,
+			jar, _ := cookiejar.New(&cookiejar.Options{})
+			client := &http.Client{
+				Jar: jar,
+			}
+
+			latestVersion, _ := GetLatestUploaderVersion(client)
+
+			if wrapperCurrentVersion == latestVersion {
+				return multistagesetup.NewSkippedTaskResult("already on the latest version: "+wrapperCurrentVersion, nil)
+			}
+
+			version, err := InstallUploader(wrapperPath)
+			if err != nil {
+				return multistagesetup.NewFailedTaskResult("", err, nil)
+			}
+
+			return multistagesetup.NewSuccessfulTaskResult(fmt.Sprintf("successfully updated: %s -> %s", wrapperCurrentVersion, version), nil)
 		}
-
-		latestVersion, _ := GetLatestUploaderVersion(client)
-
-		if wrapperCurrentVersion == latestVersion {
-			return multistagesetup.NewSkippedTaskResult("already on the latest version: " + wrapperCurrentVersion)
-		}
-
-		version, err := InstallUploader(wrapperPath)
-		if err != nil {
-			return multistagesetup.NewFailedTaskResult("", err)
-		}
-
-		return multistagesetup.NewSuccessfulTaskResult(fmt.Sprintf("successfully updated: %s -> %s", wrapperCurrentVersion, version))
 	}))
 }
 
 func SetupInstallScaAgent() multistagesetup.SetupTask {
-	return multistagesetup.NewSetupTask("Install SCA Agent", NewSimpleTask(func() tea.Msg {
-		packagerPath := getPackagerLocation()
+	return multistagesetup.NewSetupTask("Install SCA Agent", NewSimpleTask(func(values map[string]any) tea.Cmd {
+		return func() tea.Msg {
+			packagerPath := getPackagerLocation()
 
-		if err := InstallScaAgent(packagerPath); err != nil {
-			return multistagesetup.NewFailedTaskResult("", err)
+			if err := InstallScaAgent(packagerPath); err != nil {
+				return multistagesetup.NewFailedTaskResult("", err, nil)
+			}
+
+			return multistagesetup.NewSuccessfulTaskResult("successfully installed", nil)
 		}
-
-		return multistagesetup.NewSuccessfulTaskResult("successfully installed")
 	}))
 }
 

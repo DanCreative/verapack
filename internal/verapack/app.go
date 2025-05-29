@@ -92,10 +92,21 @@ func setup(cCtx *cli.Context) error {
 
 	appDir := filepath.Join(homeDir, ".veracode", "verapack")
 
-	var tasks []multistagesetup.SetupTask
-	tasks = append(tasks, Prerequisites())
-	tasks = append(tasks, SetupCredentials(homeDir)...)
-	tasks = append(tasks, SetupConfig(homeDir, appDir), InstallDependencyPackager(), InstallDependencyWrapper(), SetupInstallScaAgent())
+	if err = os.MkdirAll(appDir, 0600); err != nil {
+		fmt.Print(renderErrors(err))
+		return err
+	}
+
+	tasks := []multistagesetup.SetupTask{
+		Prerequisites(),
+		SetupCredentialsUserPrompt(homeDir),
+		SetupCredentialsFile(homeDir),
+		SetupCredentialsFileLegacy(homeDir),
+		SetupConfig(homeDir, appDir),
+		SetupInstallDependencyPackager(),
+		SetupInstallDependencyWrapper(),
+		SetupInstallScaAgent(),
+	}
 
 	p := tea.NewProgram(multistagesetup.NewModel(
 		multistagesetup.WithSpinner(defaultSpinnerOpts...),
@@ -619,8 +630,8 @@ func configureCredentials(cCtx *cli.Context) error {
 		fmt.Print(renderErrors(err))
 		return err
 	}
-	var apiKey, apiSecret string
-	p := tea.NewProgram(NewCredentialsConfigureModel(NewCredentialsTask(&apiKey, &apiSecret, nil, nil), homeDir))
+
+	p := tea.NewProgram(NewCredentialsConfigureModel(NewCredentialsTask(), homeDir))
 	if _, err := p.Run(); err != nil {
 		return err
 	}
