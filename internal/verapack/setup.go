@@ -12,7 +12,6 @@ import (
 	"os/exec"
 	"path/filepath"
 
-	"github.com/DanCreative/veracode-go/veracode"
 	"github.com/DanCreative/verapack/internal/components/multistagesetup"
 	"github.com/charmbracelet/bubbles/help"
 	"github.com/charmbracelet/bubbles/key"
@@ -138,6 +137,7 @@ type CredentialsTask struct {
 	focused           int
 	isInputDone       bool
 	apiKey, apiSecret string
+	loadCredFunc      func() (string, string, error)
 }
 
 func (m *CredentialsTask) updateHelp() {
@@ -178,7 +178,7 @@ func (m *CredentialsTask) prevInput() {
 
 func (m CredentialsTask) Init() tea.Cmd {
 	return tea.Batch(textinput.Blink, func() tea.Msg {
-		apiKey, apiSecret, err := veracode.LoadVeracodeCredentials()
+		apiKey, apiSecret, err := m.loadCredFunc()
 		if err == nil {
 			m.apiKey, m.apiSecret = apiKey, apiSecret
 			return multistagesetup.NewSkippedTaskResult("already setup", map[string]any{"apiKey": apiKey, "apiSecret": apiSecret})
@@ -270,7 +270,7 @@ func (k CredentialsFormKeyMap) FullHelp() [][]key.Binding {
 	return nil
 }
 
-func NewCredentialsTask() CredentialsTask {
+func NewCredentialsTask(loadCredFunc func() (string, string, error)) CredentialsTask {
 	inputs := make([]textinput.Model, 2)
 	inputs[0] = textinput.New()
 	inputs[0].Focus()
@@ -282,7 +282,8 @@ func NewCredentialsTask() CredentialsTask {
 	inputs[1].Prompt = ""
 
 	return CredentialsTask{
-		inputs: inputs,
+		inputs:       inputs,
+		loadCredFunc: loadCredFunc,
 		keys: CredentialsFormKeyMap{
 			Next: key.NewBinding(
 				key.WithHelp("tab/enter", "next"),
@@ -337,8 +338,8 @@ func SetupConfig(homeDir, appDir string) multistagesetup.SetupTask {
 	))
 }
 
-func SetupCredentialsUserPrompt(homeDir string) multistagesetup.SetupTask {
-	return multistagesetup.NewSetupTask("User generate and enter credentials", NewCredentialsTask())
+func SetupCredentialsUserPrompt(loadCredFunc func() (string, string, error)) multistagesetup.SetupTask {
+	return multistagesetup.NewSetupTask("User generate and enter credentials", NewCredentialsTask(loadCredFunc))
 }
 
 func SetupCredentialsFile(homeDir string) multistagesetup.SetupTask {

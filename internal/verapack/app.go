@@ -99,7 +99,7 @@ func setup(cCtx *cli.Context) error {
 
 	tasks := []multistagesetup.SetupTask{
 		Prerequisites(),
-		SetupCredentialsUserPrompt(homeDir),
+		SetupCredentialsUserPrompt(veracode.LoadVeracodeCredentials),
 		SetupCredentialsFile(homeDir),
 		SetupCredentialsFileLegacy(homeDir),
 		SetupConfig(homeDir, appDir),
@@ -154,7 +154,7 @@ func sandbox(cCtx *cli.Context) error {
 	badApps := HandleSandboxNotProvided(c.Applications, ScanTypeSandbox)
 
 	if len(badApps) == len(c.Applications) {
-		err = errors.New("there are no application with field sandbox_name")
+		err = errors.New("there are no applications with field: 'sandbox_name'")
 		fmt.Print(renderErrors(err))
 		return err
 	}
@@ -631,7 +631,7 @@ func configureCredentials(cCtx *cli.Context) error {
 		return err
 	}
 
-	p := tea.NewProgram(NewCredentialsConfigureModel(NewCredentialsTask(), homeDir))
+	p := tea.NewProgram(NewCredentialsConfigureModel(NewCredentialsTask(veracode.LoadVeracodeCredentials), homeDir))
 	if _, err := p.Run(); err != nil {
 		return err
 	}
