@@ -166,6 +166,7 @@ func NewCredentialsRefreshModel(client *veracode.Client, homeDir string) Credent
 //	verapack credential configure
 type CredentialsConfigureModel struct {
 	CredentialsTask
+	termWidth int
 	help      help.Model
 	homeDir   string
 	spinner   spinner.Model
@@ -189,6 +190,9 @@ func (m CredentialsConfigureModel) Init() tea.Cmd {
 
 func (m CredentialsConfigureModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
+	case tea.WindowSizeMsg:
+		m.termWidth = msg.Width
+
 	case tea.KeyMsg:
 		switch msg.Type {
 		case tea.KeyCtrlC:
@@ -234,7 +238,7 @@ func (m CredentialsConfigureModel) View() string {
 	var s string
 
 	if len(m.errs) < 1 {
-		style := lipgloss.NewStyle().Padding(0, 1, 1, 1).Margin(0, 0, 0, 2).Border(lipgloss.RoundedBorder()).BorderForeground(darkGray)
+		style := lipgloss.NewStyle().Padding(0, 1, 1, 1).Margin(0, 0, 0, 2).Border(lipgloss.RoundedBorder()).BorderForeground(darkGray).Width(int(float64(m.termWidth) * 0.75))
 		switch m.state {
 		case 0:
 			// waiting for user input
