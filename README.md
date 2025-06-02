@@ -33,7 +33,7 @@ Once downloaded and extracted, you can move it to a directory that makes sense t
 
 ## 📖 Basic User Guide
 
-### Setup: Part I
+### 1. Setup: Part I
 
 Once Verapack has been installed, run the first-time setup command:
 
@@ -51,7 +51,7 @@ The setup process will do the following:
 - It will create a template of the config file.
 - It will install the [Veracode Java API wrapper](https://docs.veracode.com/r/t_working_with_java_wrapper), the [Veracode CLI](https://docs.veracode.com/r/Veracode_CLI) and the [SCA CLI Agent](https://docs.veracode.com/r/Using_the_Veracode_SCA_Command_Line_Agent).
 
-### Setup: Part II
+### 2. Setup: Part II
 
 Once the setup has completed successfully, it will show you where the config file is located. You can then open that file using your favourite editor and add the applications that you wish to scan.
 
@@ -159,7 +159,7 @@ Application:
 
 </details>
 
-### Scanning
+### 3. Scanning
 
 Run below command to start policy scans for the applications specified in the config file:
 
@@ -185,7 +185,7 @@ Run below command to promote the latest sandbox scans in all of the sandboxes de
 > If some of the applications do not have the sandbox_name field set, the user will be given a choice to proceed with the valid applications, to cancel before starting or to run a policy scan for the invalid applications.
 
 > [!IMPORTANT]
-> The sandboxes must already contain atleast one scan otherwise promotion for that application and sandbox will fail.
+> The sandboxes must already contain at least one scan otherwise promotion for that application and sandbox will fail.
 
 ```powershell
 .\verapack scan promote
@@ -207,7 +207,7 @@ Keys | Action
 <kbd>ctrl + c</kbd> | Quit the program.
 <kbd>?</kbd> | See a full list of the keys available.
 
-### Update the Veracode tools
+### 4. Stay up to date
 
 You can run below command to check what versions of the tools are currently installed and to check if they are up to date.
 
@@ -225,7 +225,7 @@ If there is a new version of the tools available, you can run below command to u
 
 <img width="600" alt="A GIF demonstrating the update command" src=".vhs/output/update.gif">
 
-### Credential Management
+### 5. Credential Management
 
 Veracode API credentials expire after one year. You can run below command to automatically refresh your credentials and to add the new ones to your local credential files.
 
