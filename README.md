@@ -27,9 +27,7 @@ The scope of this tool is not to replace automated security testing. This tool i
 
 ## 📥 Installation
 
-If you have Go installed, then you can simply run this command to install the tool: `go install github.com/DanCreative/verapack`. Otherwise, you can download the latest binary from the [releases](https://github.com/DanCreative/verapack/releases) tab.
-
-Once downloaded and extracted, you can move it to a directory that makes sense to you and add said directory path to your user account `PATH` environment variable. E.g. `%Appdata%\verapack`
+To install Verapack, you can download the latest build from the [releases](https://github.com/DanCreative/verapack/releases) tab. Then once the archive has been downloaded and extracted, you can move the binary inside to a directory that makes sense to you and add said directory path to your user account `PATH` environment variable. E.g. `%Appdata%\verapack`
 
 ## 📖 Basic User Guide
 
