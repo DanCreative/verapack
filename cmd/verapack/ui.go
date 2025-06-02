@@ -1,4 +1,4 @@
-// go: build ui
+//go:build ui
 
 // This file with this build constraint will be used for UI testing and demos.
 package main
