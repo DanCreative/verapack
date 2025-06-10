@@ -16,9 +16,10 @@ import (
 var (
 	errNoArtifacts  = errors.New("no artefacts created")
 	errPackagingErr = errors.New("packaging error")
+	errCloningErr   = errors.New("cloning error")
 )
 
-func packageOptionsToArgs(options Options) []string {
+func packageOptionsToArgs(options Options, outputDirPath string) []string {
 	r := []string{"package"}
 
 	if *options.Verbose {
@@ -37,8 +38,8 @@ func packageOptionsToArgs(options Options) []string {
 		r = append(r, "-t", string(options.Type))
 	}
 
-	if options.OutputDir != "" {
-		r = append(r, "-o", options.OutputDir)
+	if outputDirPath != "" {
+		r = append(r, "-o", outputDirPath)
 	}
 
 	if options.PackageSource != "" {
@@ -48,17 +49,35 @@ func packageOptionsToArgs(options Options) []string {
 	return r
 }
 
+func cloneOptionsToArgs(options Options, outputDirPath string) []string {
+	r := make([]string, 0, 8)
+	r = append(r, "clone", "--single-branch", "--depth", "1")
+
+	if len(options.Branch) > 0 {
+		r = append(r, "--branch", options.Branch)
+	}
+
+	switch options.Type {
+	case Directory:
+		r = append(r, "file://"+options.PackageSource, outputDirPath)
+	case Repo:
+		r = append(r, options.PackageSource, outputDirPath)
+	}
+
+	return r
+}
+
 // PackageApplication runs the Veracode auto-packager using the provided PackageOptions,
 // and returns a list of the artefact paths and any errors encountered.
 //
 // writer can optionally be provided to write log output to an additional location.
-func PackageApplication(options Options, writer io.Writer) ([]string, string, error) {
+func PackageApplication(options Options, outputDirPath string, writer io.Writer) ([]string, string, error) {
 	path, err := exec.LookPath("veracode")
 	if err != nil {
 		return nil, "", err
 	}
 
-	cmd := exec.Command(path, packageOptionsToArgs(options)...)
+	cmd := exec.Command(path, packageOptionsToArgs(options, outputDirPath)...)
 
 	var outBuffer bytes.Buffer
 
@@ -78,12 +97,43 @@ func PackageApplication(options Options, writer io.Writer) ([]string, string, er
 		return nil, err.Error() + "\n" + out, errPackagingErr
 	}
 
-	artefacts, err := getArtefactPath(options.OutputDir)
+	artefacts, err := getArtefactPath(outputDirPath)
 	if err != nil {
 		return nil, err.Error() + "\n" + out, err
 	}
 
 	return artefacts, out, nil
+}
+
+// CloneRepository creates a shallow clone of a remote or local repository into the temp
+// directory. CloneRepository returns the log output and any error.
+//
+// writer can optionally be provided to write log output to an additional location.
+func CloneRepository(options Options, outputDirPath string, writer io.Writer) (string, error) {
+	path, err := exec.LookPath("git")
+	if err != nil {
+		return "", err
+	}
+
+	cmd := exec.Command(path, cloneOptionsToArgs(options, outputDirPath)...)
+
+	var outBuffer bytes.Buffer
+
+	if writer != nil {
+		cmd.Stderr = io.MultiWriter(&outBuffer, writer)
+		cmd.Stdout = io.MultiWriter(&outBuffer, writer)
+	} else {
+		cmd.Stderr, cmd.Stdout = &outBuffer, &outBuffer
+	}
+
+	err = cmd.Run()
+	out := outBuffer.String()
+
+	if err != nil {
+		return err.Error() + "\n" + out, errCloningErr
+	}
+
+	return out, nil
 }
 
 // getArtefactPath takes a directory string and returns a []string of the artefact paths

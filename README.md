@@ -20,6 +20,7 @@ The scope of this tool is not to replace automated security testing. This tool i
 
 - **Windows amd64**, the Verapack tool is currently only designed to work on this OS/Architecture.
 - **Java 8, 11 or 17**, this is required for one of the Veracode tools.
+- **git**, git must be installed and added to the user's path. Verapack currently only supports git-based repositories.
 - Please review the [language support](https://docs.veracode.com/r/About_auto_packaging#supported-languages) for the **auto-packager**.
 
 > [!NOTE]
@@ -57,7 +58,7 @@ The config file is in YAML format, and is structured like below. Please see an e
 
 <details>
 
-<summary style="color: #00b3e6;">Config file YAML schema</summary>
+<summary>Config file YAML schema</summary>
 
 ```yaml
 ConfigFile:
@@ -99,6 +100,10 @@ Application:
                 Setting this field will use the auto-packager.
 
                 value must be a valid directory or URL.
+        branch:
+            type: string
+            descriptions: >
+                Name of the specific branch that you want to scan. 
         artefact_paths:
             type: array
             description: >

@@ -517,6 +517,11 @@ func Prerequisites() multistagesetup.SetupTask {
 				p.warnings = append(p.warnings, "Java was not found on the path. You can either install Java version 8, 11 or 17.")
 			}
 
+			_, err = exec.LookPath("git")
+			if err != nil {
+				p.warnings = append(p.warnings, "git was not found on the path.")
+			}
+
 			return p
 		},
 	))

@@ -2,6 +2,7 @@ package verapack
 
 import (
 	"os"
+	"path/filepath"
 
 	"github.com/DanCreative/verapack/internal/components/reportcard"
 	tea "github.com/charmbracelet/bubbletea"
@@ -22,8 +23,13 @@ type reporter interface {
 func packageAndUploadApplication(uploaderPath string, options Options, appId int, reporter reporter) error {
 	var err error
 	if options.PackageSource != "" {
-		// Options.OutputDir is only set here
-		options.OutputDir, err = createAppPackagingOutputDir(options.AppName)
+		// Run the auto-packager
+
+		// packageOutputBaseDirectory is the path to the individual apps' temp folder.
+		// It will contain a source clone folder and an artefact output folder.
+		var packageOutputBaseDirectory string
+
+		packageOutputBaseDirectory, err = createAppPackagingOutputDir(options.AppName)
 		if err != nil {
 			reporter.Send(reportcard.TaskResultMsg{
 				Status:  reportcard.Failure,
@@ -34,9 +40,31 @@ func packageAndUploadApplication(uploaderPath string, options Options, appId int
 			return err
 		}
 
-		artefactPaths, out, err := PackageApplication(options, nil)
+		cloneOut, err := CloneRepository(options, filepath.Join(packageOutputBaseDirectory, "source"), nil)
 		if err != nil {
+			reporter.Send(reportcard.TaskResultMsg{
+				Status:  reportcard.Failure,
+				Output:  cloneOut,
+				Index:   appId,
+				IsFatal: true,
+			})
+			return err
+		}
 
+		// The source code retrieved from the git shallow clone will be used as the input
+		// for the packaging.
+		// Regardless of whether the original source was repo or dir, the packager is told
+		// to use dir.
+		options.PackageSource = filepath.Join(packageOutputBaseDirectory, "source")
+		options.Type = Directory
+
+		artefactPaths, out, err := PackageApplication(options, filepath.Join(packageOutputBaseDirectory, "out"), nil)
+
+		if *options.Verbose {
+			out = cloneOut + out
+		}
+
+		if err != nil {
 			reporter.Send(reportcard.TaskResultMsg{
 				Status:  reportcard.Failure,
 				Output:  out,
@@ -50,7 +78,7 @@ func packageAndUploadApplication(uploaderPath string, options Options, appId int
 		// at the end.
 		defer func() {
 			if *options.AutoCleanup {
-				os.RemoveAll(options.OutputDir)
+				os.RemoveAll(packageOutputBaseDirectory)
 			}
 
 			reporter.Send(reportcard.TaskResultMsg{
