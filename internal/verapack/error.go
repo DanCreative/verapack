@@ -99,6 +99,15 @@ func rawRenderErrors(width int, errs ...error) string {
 					msg = fmt.Sprintf("config validation error at %s: field must be greater or equal to: '%s'", e.Namespace(), e.Param())
 				case "max":
 					msg = fmt.Sprintf("config validation error at %s: field must be equal to or smaller than: '%s'", e.Namespace(), e.Param())
+				case "package_source":
+					switch e.Param() {
+					case "repo":
+						msg = fmt.Sprintf("config validation error at %s: field: 'type' is equal to 'repo', therefore field 'package_source' must be a valid URL", e.Namespace())
+
+					case "directory":
+						msg = fmt.Sprintf("config validation error at %s: field: 'type' is equal to 'directory', therefore field 'package_source' must be an existing directory path", e.Namespace())
+
+					}
 				default:
 					msg = fmt.Sprintf("config validation error at %s: unspecified error with field, tag=%s,param=%s", e.Namespace(), e.Tag(), e.Param())
 				}
@@ -141,4 +150,8 @@ func rawRenderErrors(width int, errs ...error) string {
 	}
 
 	return r
+}
+
+func RenderErrors(errs ...error) string {
+	return renderErrors(errs...)
 }

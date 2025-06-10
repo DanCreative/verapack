@@ -2,7 +2,9 @@ package verapack
 
 import (
 	_ "embed"
+	"net/url"
 	"os"
+	"strings"
 	"time"
 
 	"dario.cat/mergo"
@@ -59,14 +61,14 @@ type Options struct {
 
 	Verbose       *bool      `yaml:"verbose"`
 	AutoCleanup   *bool      `yaml:"auto_cleanup"`
-	OutputDir     string     `yaml:"-"`
-	PackageSource string     `yaml:"package_source" validate:"required_without=ArtefactPaths,omitempty,url|dir"`
+	PackageSource string     `yaml:"package_source" validate:"required_without=ArtefactPaths,omitempty"`
 	Trust         *bool      `yaml:"-"`
 	Strict        bool       `yaml:"strict"`
 	Type          SourceType `yaml:"type" validate:"oneof=directory repo"`
 
 	// Other options:
 	ScanType ScanType `yaml:"-"` // The type of scan to run. Can be either policy or sandbox at this stage.
+	Branch   string   `yaml:"branch"`
 }
 
 type Config struct {
@@ -91,6 +93,14 @@ func NewConfig() Config {
 	}
 }
 
+func NewValidator() *validator.Validate {
+	validate = validator.New()
+
+	validate.RegisterStructValidation(optionsStructLevelValidation, Options{})
+
+	return validate
+}
+
 // ReadConfig loads the config from a file, sets all of the defaults/overrides and validates the input.
 func ReadConfig(filePath string) (Config, error) {
 	content, err := os.ReadFile(filePath)
@@ -103,7 +113,7 @@ func ReadConfig(filePath string) (Config, error) {
 		return Config{}, err
 	}
 
-	validate = validator.New()
+	NewValidator()
 
 	if err = validate.Struct(&c); err != nil {
 		return Config{}, err
@@ -138,4 +148,56 @@ func setDynamicDefaults(config *Config) {
 	if config.Default.Version == "" {
 		config.Default.Version = time.Now().Format("02 Jan 2006 15:04PM Static")
 	}
+}
+
+func optionsStructLevelValidation(sl validator.StructLevel) {
+	options := sl.Current().Interface().(Options)
+
+	switch options.Type {
+	case Directory:
+		if !isDir(options.PackageSource) {
+			sl.ReportError(options.PackageSource, "PackageSource", "PackageSource", "package_source", "directory")
+		}
+
+	case Repo:
+		if !isURL(options.PackageSource) {
+			sl.ReportError(options.PackageSource, "PackageSource", "PackageSource", "package_source", "repo")
+		}
+	}
+}
+
+// isDir is the validation function for validating if the current field's value is a valid existing directory.
+func isDir(value string) bool {
+	fileInfo, err := os.Stat(value)
+	if err != nil {
+		return false
+	}
+
+	return fileInfo.IsDir()
+}
+
+// isURL is the validation function for validating if the current field's value is a valid URL.
+//
+// Example from validator: https://github.com/go-playground/validator/blob/master/baked_in.go#L1474
+func isURL(value string) bool {
+	s := strings.ToLower(value)
+
+	if len(s) == 0 {
+		return false
+	}
+
+	// if isFileURL(s) {
+	// 	return true
+	// }
+
+	url, err := url.Parse(s)
+	if err != nil || url.Scheme == "" {
+		return false
+	}
+
+	if url.Host == "" && url.Fragment == "" && url.Opaque == "" {
+		return false
+	}
+
+	return true
 }

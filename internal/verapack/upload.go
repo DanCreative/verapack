@@ -19,18 +19,22 @@ func uploadOptionsToArgs(options Options) []string {
 	// Forces the jar to use the Windows trust store.
 	// This is to fix a Java sun.security.provider.certpath.SunCertPathBuilderException
 	// when running the application behind a corporate proxy with its own cert.
-	r := []string{"-Djavax.net.ssl.trustStoreType=WINDOWS-ROOT", "-jar", options.UploaderFilePath, "-action", "UploadAndScan"}
+
+	r := make([]string, 0, 30) // capacity is set to 1.5x max number of possible options. Remember to change when adding options.
+
+	r = append(r,
+		"-Djavax.net.ssl.trustStoreType=WINDOWS-ROOT",
+		"-jar", options.UploaderFilePath,
+		"-action", "UploadAndScan",
+		"-appname", options.AppName, // Required field
+		"-version", options.Version, // Required field
+		"-createprofile", strconv.FormatBool(*options.CreateProfile), // Required field
+	)
 
 	// Required fields
 	for _, filepath := range options.ArtefactPaths {
 		r = append(r, "-filepath", filepath)
 	}
-
-	r = append(r,
-		"-appname", options.AppName,
-		"-version", options.Version,
-		"-createprofile", strconv.FormatBool(*options.CreateProfile),
-	)
 
 	// Optional fields
 	if options.ScanTimeout != 0 {
@@ -42,6 +46,10 @@ func uploadOptionsToArgs(options Options) []string {
 
 	if options.ScanType == ScanTypeSandbox {
 		r = append(r, "-sandboxid", strconv.Itoa(options.SandboxId))
+	}
+
+	if *options.Verbose {
+		r = append(r, "-debug")
 	}
 
 	return r
