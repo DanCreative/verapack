@@ -97,7 +97,7 @@ func NewValidator() *validator.Validate {
 }
 
 // ReadConfig loads the config from a file, sets all of the defaults/overrides and validates the input.
-func ReadConfig(filePath string) (Config, error) {
+func ReadConfig(filePath string, includeAppNames ...string) (Config, error) {
 	content, err := os.ReadFile(filePath)
 	if err != nil {
 		return Config{}, err
@@ -107,6 +107,18 @@ func ReadConfig(filePath string) (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
+
+	filteredApps := make([]Options, 0, len(c.Applications))
+
+	for _, app1 := range c.Applications {
+		for _, app2 := range includeAppNames {
+			if strings.EqualFold(app1.AppName, app2) {
+				filteredApps = append(filteredApps, app1)
+			}
+		}
+	}
+
+	c.Applications = filteredApps
 
 	NewValidator()
 
