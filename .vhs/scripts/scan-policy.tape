@@ -6,7 +6,7 @@
 
 # Setup
 Output .vhs/output/scan-policy.gif
-Set Width 1600
+Set Width 1700
 Set Height 1000
 Set FontSize 30
 Set Shell "powershell"
@@ -15,7 +15,7 @@ Require go
 
 # Build
 Hide
-Type `go build "-tags=ui" -ldflags='-X "main.Version='0.5.2-dev'"' -o . ./cmd/verapack`
+Type `go build "-tags=ui" -ldflags='-X "main.Version='x.y.z-dev'"' -o . ./cmd/verapack`
 Enter
 
 # Add test data
@@ -39,7 +39,7 @@ Type@2s "gt"
 
 Sleep 2s
 
-Wait+Screen /✓/
+Wait+Screen /⛊ C.PASS/
 
 Type "s"
 Sleep 1s
@@ -73,8 +73,8 @@ Sleep 15s
 # Teardown
 
 Hide
-Type "Remove-Item -Path verapack.exe"
+Type "Remove-Item -Path .\verapack.exe"
 Enter
 
-Type "Remove-Item -Path config.yaml"
+Type "Remove-Item -Path .\versions.yaml"
 Enter

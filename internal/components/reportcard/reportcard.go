@@ -32,11 +32,17 @@ const (
 )
 
 type TaskResultMsg struct {
-	Status    TaskStatus
-	Index     int    // Index is the index of the item in Model.Rows
-	taskIndex int    // Gets set internally after a failure. This is used to match failures to specific tasks on the frontend.
-	Output    string // Should be set on failure. Will be displayed to the end user.
-	IsFatal   bool   // Skip all following tasks
+	Status              TaskStatus
+	Index               int              // Index is the index of the item in [Model].rows
+	taskIndex           int              // Gets set internally after a failure. This is used to match failures to specific tasks on the frontend.
+	Output              string           // Should be set on failure. Will be displayed to the end user.
+	IsFatal             bool             // Skip all following tasks
+	CustomSuccessStatus CustomTaskStatus //  CustomTaskStatus contains options for replacing the normal success symbol.
+}
+
+type CustomTaskStatus struct {
+	Message          string // If Message is set, the alignment of the text in the column will be left-aligned.
+	ForegroundColour string
 }
 
 type Task struct {
@@ -44,7 +50,8 @@ type Task struct {
 	// ShouldRunAnywayFor allows a task to "run" on the reportcard regardless of if a previous task
 	// failed fatally. ShouldRunAnywayFor is a map[int]bool where the keys are task indexes and the
 	// values are bools indicating whether the task should run for said task.
-	ShouldRunAnywayFor map[int]bool
+	ShouldRunAnywayFor  map[int]bool
+	customSuccessStatus CustomTaskStatus
 }
 
 type Row struct {
@@ -487,6 +494,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			msg.taskIndex = taskIndex
 			m.selector.AddSelectable(msg, msg.Index, msg.taskIndex)
 
+			m.rows[msg.Index].Tasks[m.activeTasks[msg.Index]].customSuccessStatus = msg.CustomSuccessStatus
+
 			switch msg.Status {
 			case Success:
 				m.rows[msg.Index].Tasks[m.activeTasks[msg.Index]].Status = Success
@@ -593,10 +602,14 @@ func (m *Model) updateAvailableKeys() {
 //   - taskIndex int 	(index of the task from which to check onwards)
 //   - isFatal bool 	(bool indicating if the task failed fatally)
 func (m *Model) handleRemainingTasks(i int, taskIndex int, isFatal bool) {
-	var s bool
+	var rowNotDone bool
+
+	if isFatal {
+		m.rows[i].FinalStatus = Failure
+	}
+
 	for k := taskIndex; k < len(m.rows[i].Tasks); k++ {
 		if m.rows[i].Tasks[k].Status == NotStarted {
-			m.activeTasks[i] = k
 
 			if isFatal {
 				if m.rows[i].Tasks[k].ShouldRunAnywayFor[taskIndex] {
@@ -604,22 +617,23 @@ func (m *Model) handleRemainingTasks(i int, taskIndex int, isFatal bool) {
 					// task is allowed to run anyway, change its status to
 					// InProgress
 					m.rows[i].Tasks[k].Status = InProgress
-					s = true
+					rowNotDone = true
+					m.activeTasks[i] = k
+
 				} else {
 					m.rows[i].Tasks[k].Status = Skip
 				}
 
-				m.rows[i].FinalStatus = Failure
-
 			} else {
 				m.rows[i].Tasks[k].Status = InProgress
-				s = true
+				rowNotDone = true
+				m.activeTasks[i] = k
 				break
 			}
 		}
 	}
 
-	if !s {
+	if !rowNotDone {
 		// Row is done, there are no more tasks to run.
 
 		// Update the total counts for the different statuses.
@@ -743,8 +757,27 @@ func (m Model) renderRow(i int) string {
 	}
 
 	for k, col := range m.taskColumns {
-		style = lipgloss.NewStyle().Width(col.Width).MaxWidth(col.Width).Inline(true).Align(lipgloss.Center)
-		s = append(s, m.renderTaskColumn(m.rows[i].Tasks[k].Status, style, i, k))
+		if customStatus := m.rows[i].Tasks[k].customSuccessStatus; customStatus.Message != "" {
+
+			style = lipgloss.NewStyle().Width(col.Width).MaxWidth(col.Width).Inline(true).Align(lipgloss.Left)
+
+			var r string
+
+			if selectedItem, row, icol := m.selector.GetSelected(); m.showOutput && selectedItem != nil && row == i && k == icol {
+				r = m.styles.Cell.Inherit(m.styles.Selected).Render(style.Render(customStatus.Message))
+			} else {
+				if customStatus.ForegroundColour != "" {
+					style = style.Foreground(lipgloss.Color(customStatus.ForegroundColour))
+				}
+				r = m.styles.Cell.Render(style.Render(customStatus.Message))
+			}
+
+			s = append(s, r)
+
+		} else {
+			style = lipgloss.NewStyle().Width(col.Width).MaxWidth(col.Width).Inline(true).Align(lipgloss.Center)
+			s = append(s, m.renderTaskColumn(m.rows[i].Tasks[k].Status, style, i, k))
+		}
 	}
 
 	return lipgloss.JoinHorizontal(lipgloss.Top, s...)

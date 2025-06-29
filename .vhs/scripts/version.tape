@@ -15,7 +15,7 @@ Require go
 
 # Build
 Hide
-Type `go build "-tags=ui" -ldflags='-X "main.Version='0.5.2-dev'"' -o . ./cmd/verapack`
+Type `go build "-tags=ui" -ldflags='-X "main.Version='x.y.z-dev'"' -o . ./cmd/verapack`
 Enter
 
 # Add test data
