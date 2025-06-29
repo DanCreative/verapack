@@ -39,19 +39,25 @@ func NewApp() *cli.App {
 				Aliases: []string{"r"},
 				Subcommands: []*cli.Command{
 					{
-						Name:   "sandbox",
-						Usage:  "Run a sandbox scan for the applications defined in the config file",
-						Action: sandbox,
+						Name:      "sandbox",
+						Usage:     "Run a sandbox scan for the applications defined in the config file",
+						Action:    sandbox,
+						Args:      true,
+						ArgsUsage: "[APPLICATION...]",
 					},
 					{
-						Name:   "policy",
-						Usage:  "Run a policy scan for the applications defined in the config file",
-						Action: policy,
+						Name:      "policy",
+						Usage:     "Run a policy scan for the applications defined in the config file",
+						Action:    policy,
+						Args:      true,
+						ArgsUsage: "[APPLICATION...]",
 					},
 					{
-						Name:   "promote",
-						Usage:  "Promote the latest sandbox scan for the applications defined in the config file",
-						Action: promote,
+						Name:      "promote",
+						Usage:     "Promote the latest sandbox scan for the applications defined in the config file",
+						Action:    promote,
+						Args:      true,
+						ArgsUsage: "[APPLICATION...]",
 					},
 				},
 			},
@@ -144,7 +150,7 @@ func sandbox(cCtx *cli.Context) error {
 
 	// 1. Load & validate config and handle sandbox edge cases
 
-	c, err := ReadConfig(filepath.Join(homeDir, ".veracode", "verapack", "config.yaml"))
+	c, err := ReadConfig(filepath.Join(homeDir, ".veracode", "verapack", "config.yaml"), cCtx.Args().Slice()...)
 	if err != nil {
 		fmt.Print(renderErrors(err))
 		return err
@@ -297,7 +303,7 @@ func promote(cCtx *cli.Context) error {
 		return err
 	}
 
-	c, err := ReadConfig(filepath.Join(homeDir, ".veracode", "verapack", "config.yaml"))
+	c, err := ReadConfig(filepath.Join(homeDir, ".veracode", "verapack", "config.yaml"), cCtx.Args().Slice()...)
 	if err != nil {
 		fmt.Print(renderErrors(err))
 		return err
@@ -515,7 +521,7 @@ func policy(cCtx *cli.Context) error {
 
 	uploaderPath := filepath.Join(getWrapperLocation(), "VeracodeJavaAPI.jar")
 
-	c, err := ReadConfig(filepath.Join(homeDir, ".veracode", "verapack", "config.yaml"))
+	c, err := ReadConfig(filepath.Join(homeDir, ".veracode", "verapack", "config.yaml"), cCtx.Args().Slice()...)
 	if err != nil {
 		fmt.Print(renderErrors(err))
 		return err
