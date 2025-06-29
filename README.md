@@ -11,6 +11,7 @@ The scope of this tool is not to replace automated security testing. This tool i
 - Convenient setup process that simplifies setting up local credential files and installs Veracode tools.
 - Manage all scanning configurations from a central `config.yaml` file.
 - Run a **Policy**-, **Sandbox**-, **Sandbox Promotion** or mixed scans asynchronously.
+- You can leave the scans running in the background and view the results in the application once the scans complete.
 - You can use a URL to the repo, path to the local project or provide a list of pre-built artefacts to scan for each of the different applications.
 - Use the [Veracode auto-packager](https://docs.veracode.com/r/About_auto_packaging) to automatically package the applications.
 - Check the latest versions of the installed tooling and automatically update them.
@@ -56,109 +57,39 @@ Once the setup has completed successfully, it will show you where the config fil
 
 The config file is in YAML format, and is structured like below. Please see an example template file [here](https://github.com/DanCreative/verapack/tree/main/internal/verapack/config.yaml).
 
+#### Config file YAML Schema
+
 <details>
 
-<summary>Config file YAML schema</summary>
+<summary>Click here to expand</summary>
 
-```yaml
-ConfigFile:
-    type: object
-    properties:
-        default:
-            description: >
-                The default section will contain all of the default values for the settings 
-                that will be applied to all application specified in the applications section.
-            schema:
-                $ref: "#/Application"
-        applications:
-            description: >
-                The applications section will contain a list of your application profiles. 
-                Settings set here will override the default values set in the default section.
-            type: array
-            items:
-                schema:
-                    $ref: "#/Application"
+<br>
 
-Application:
-    type: object
-    description: Contains all of the settings for a specific application profile.
-    required:
-        - app_name
-        - EITHER package_source OR artefact_paths
-    properties:
-        app_name:
-            type: string
-            description: >
-                The name of the application profile on the Veracode platform.
-        package_source:
-            type: string
-            description: >
-                Location of the source to package based on the target type. 
-                If the type is directory, enter the path to a local directory. 
-                If the type is repo, enter the URL to a Git version control system.
-                For each application, you can either set this field or the artefact_paths field (but not both or neither). 
-                Setting this field will use the auto-packager.
+Field Name | Field Type | Required | Description
+--- | --- | --- | ---
+default | $${\color{lightgreen}Application}$$ | false | The default section will contain all of the default values for the settings that will be applied to all application specified in the applications section.
+applications | $${Array \space of \color{lightgreen}Application}$$ | true | The applications section will contain a list of your application profiles. Settings set here will override the default values set in the default section.
 
-                value must be a valid directory or URL.
-        branch:
-            type: string
-            descriptions: >
-                Name of the specific branch that you want to scan. 
-        artefact_paths:
-            type: array
-            description: >
-                A list of paths to specific files or directories that you want to upload for scanning. 
-                For each application, you can either set this field or the artefact_paths field (but not both or neither). 
-                Setting this field will bypass auto-packager and upload the files/directories and sub-directories directly.
-            items:
-                type: string 
-                description: >
-                    value must be a valid directory or file path.
-        verbose:
-            type: bool
-            description: Increase output verbosity.
-        auto_cleanup:
-            type: bool
-            description: >
-                Automatically remove any packaged artefacts after scanning completes.
-        type:
-            type: string
-            enum: [directory, repo]
-            description: > 
-                Specifies the target type you want to package. This is used with package_source
-                to automatically package either a repo or a local directory.
-                The default value is directory.
-        strict:
-            type: bool
-            description: >
-                If this optional flag is enabled, the exit code 4 indicates build failure during packaging.
-        create_profile:
-            type: bool
-            description: >
-                Create a new application profile if one with the name set in app_name does not exist already.
-        sandbox_name:
-            type: string
-            description: >
-                Name of the sandbox to use when running a sandbox scan or promoting a sandbox scan. 
-                If a sandbox with this name does not exist, it will be created.
-        version:
-            type: string
-            description: >
-                Name or version of the build that you want to scan. This will be used as the scan name. 
-                If omitted, the current date time in this format: "02 Jan 2006 15:04PM Static" will be used.
-        scan_timeout:
-            type: integer
-            description: >
-                Number of minutes to wait for the scan to complete and pass policy. 
-                If the scan does not complete or fails policy, the build fails.
-        scan_polling_interval:
-            type: integer
-            description: >
-                Interval, in seconds, to poll for the status of a running scan. 
-                Only applicable if scan_timeout is set.
-            minimum: 30
-            maximum: 120
-```
+<br>
+
+$${\color{lightgreen}Application}$$
+
+Field Name | Field Type | Required | Description
+--- | --- | --- | ---
+app_name | $${\color{lightblue}string}$$ | true | The name of the application profile on the Veracode platform.
+package_source | $${\color{lightblue}string}$$ | either ```this``` field or ```artefact_paths``` is required | Location of the source to package based on the target type. If the type is directory, enter the path to a local directory. If the type is repo, enter the URL to a Git version control system. For each application, you can either set ```this``` field or the ```artefact_paths``` field (but not both or neither). Setting this field will use the auto-packager. The value must be a valid directory or URL.
+artefact_paths | $${Array \space of \color{lightblue}string}$$ | either ```this``` field or ```package_source``` is required | A list of paths to specific files or directories that you want to upload for scanning. For each application, you can either set ```this``` field or the ```package_source``` field (but not both or neither). Setting this field will bypass auto-packager and upload the files/directories and sub-directories directly. The values must be valid directory- or file paths.
+branch | $${\color{lightblue}string}$$ | false | Name of the specific branch that you want to scan.
+verbose | $${\color{pink}bool}$$ | false | Increase output verbosity.
+auto_cleanup | $${\color{pink}bool}$$ | false | Automatically remove any packaged artefacts after scanning completes.
+type | $${\color{lightblue}string}$$ | false | Specifies the target type you want to package. This is used with ```package_source``` to automatically package either a repo or a local directory. The values can be: ```directory``` or ```repo```. The default value is ```directory```.
+strict | $${\color{pink}bool}$$ | false | If this field is true, the packaging step will fail on application build failure.
+create_profile | $${\color{pink}bool}$$ | false | Create a new application profile if one with the name set in ```app_name``` does not exist already.
+sandbox_name | $${\color{lightblue}string}$$ | false | Name of the sandbox to use when running a sandbox scan or promoting a sandbox scan. If a sandbox with this name does not exist, it will be created.
+version | $${\color{lightblue}string}$$ | false | Name or version of the build that you want to scan. This will be used as the scan name. If omitted, the current date-time in this format: "02 Jan 2006 15:04PM Static" will be used.
+wait_for_result | $${\color{pink}bool}$$ | false | Wait for the scan to complete and return the status of the scan. ```scan_timeout``` and ```scan_polling_interval``` can optionally be set to customize the behaviour.
+scan_timeout | $${\color{orange}int}$$ | false | Number of minutes to wait for the scan to complete. Only applicable when ```wait_for_result``` is set. The default value is: 120
+scan_polling_interval | $${\color{orange}int}$$ | false | Interval, in seconds, to poll for the status of a running scan. Only applicable when ```wait_for_result``` is set. The value can be between: 30 - 120. The default value is: 30
 
 </details>
 

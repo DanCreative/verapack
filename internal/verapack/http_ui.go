@@ -11,6 +11,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/DanCreative/veracode-go/veracode"
 )
 
 type apiCredentials_ui struct {
@@ -37,6 +39,8 @@ type profile struct {
 
 func newVeracodeMockServer(config Config) *httptest.Server {
 	return httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Add("Content-Type", "application/json")
+
 		time.Sleep(time.Duration(rand.IntN(500)+100) * time.Millisecond)
 
 		if strings.HasSuffix(r.URL.Path, "/promote") {
@@ -141,17 +145,24 @@ func newVeracodeMockServer(config Config) *httptest.Server {
 	}))
 }
 
-func newVeracodeMockClient(mockServerHost string) *http.Client {
+func newVeracodeMockClient(mockServerHost string) (*veracode.Client, error) {
 	tr := &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 	}
 
-	return &http.Client{
+	httpClient := &http.Client{
 		Transport: &mockRoundtripper{
 			mockServerHost: mockServerHost,
 			transport:      tr,
 		},
 	}
+
+	client, err := veracode.NewClient(httpClient, "", "")
+	if err != nil {
+		return nil, err
+	}
+
+	return client, nil
 }
 
 type mockRoundtripper struct {

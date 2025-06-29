@@ -15,7 +15,6 @@ import (
 	sand "github.com/DanCreative/verapack/internal/components/middleware/sandbox"
 	"github.com/DanCreative/verapack/internal/components/middleware/singleselect"
 	"github.com/DanCreative/verapack/internal/components/multistagesetup"
-	"github.com/DanCreative/verapack/internal/components/reportcard"
 	"github.com/DanCreative/verapack/internal/components/version"
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
@@ -159,23 +158,7 @@ func sandbox(cCtx *cli.Context) error {
 		return err
 	}
 
-	key, secret, err := veracode.LoadVeracodeCredentials()
-	if err != nil {
-		fmt.Print(renderErrors(err))
-		return err
-	}
-
-	jar, err := cookiejar.New(&cookiejar.Options{})
-	if err != nil {
-		fmt.Print(renderErrors(err))
-		return err
-	}
-
-	httpClient := &http.Client{
-		Jar: jar,
-	}
-
-	client, err := veracode.NewClient(httpClient, key, secret)
+	client, err := NewVeracodeClient()
 	if err != nil {
 		fmt.Print(renderErrors(err))
 		return err
@@ -286,7 +269,7 @@ func sandbox(cCtx *cli.Context) error {
 				if app.ScanType == ScanTypePromote {
 					promoteSandbox(client, ctx, app, k, p)
 				} else {
-					packageAndUploadApplication(uploaderPath, app, k, p)
+					packageAndUploadApplication(uploaderPath, app, k, p, client, ctx)
 				}
 			}()
 		}
@@ -320,23 +303,7 @@ func promote(cCtx *cli.Context) error {
 		return err
 	}
 
-	key, secret, err := veracode.LoadVeracodeCredentials()
-	if err != nil {
-		fmt.Print(renderErrors(err))
-		return err
-	}
-
-	jar, err := cookiejar.New(&cookiejar.Options{})
-	if err != nil {
-		fmt.Print(renderErrors(err))
-		return err
-	}
-
-	httpClient := &http.Client{
-		Jar: jar,
-	}
-
-	client, err := veracode.NewClient(httpClient, key, secret)
+	client, err := NewVeracodeClient()
 	if err != nil {
 		fmt.Print(renderErrors(err))
 		return err
@@ -518,7 +485,7 @@ func promote(cCtx *cli.Context) error {
 				if app.ScanType == ScanTypePromote {
 					promoteSandbox(client, ctx, app, k, p)
 				} else {
-					packageAndUploadApplication(uploaderPath, app, k, p)
+					packageAndUploadApplication(uploaderPath, app, k, p, client, ctx)
 				}
 			}()
 		}
@@ -561,23 +528,19 @@ func policy(cCtx *cli.Context) error {
 	path := os.Getenv("PATH")
 	os.Setenv("PATH", path+";"+getPackagerLocation())
 
-	p := tea.NewProgram(reportcard.NewModel(
-		reportcard.WithSpinner(defaultSpinnerOpts...),
-		reportcard.WithStyles(reportcard.Styles{
-			NameHeader:  lipgloss.NewStyle().Bold(true).Padding(0, 1),
-			TaskHeaders: lipgloss.NewStyle().Bold(true).Padding(0, 1),
-			Cell:        lipgloss.NewStyle().Padding(0, 1),
-			Border:      lipgloss.NewStyle().BorderStyle(lipgloss.RoundedBorder()).BorderForeground(darkGray).Padding(0, 2).MarginLeft(2),
-			Selected:    lipgloss.NewStyle().Foreground(lightBlue),
-		}),
-		reportcard.WithData(appsToRows(c.Applications, columnOptionsStandard)),
-		reportcard.WithTasks([]reportcard.Column{{Name: "Package", Width: 7}, {Name: "Scan", Width: 4}, {Name: "Cleanup", Width: 7}}),
-		reportcard.WithPrefixColumns([]reportcard.Column{{Name: "Scan Type", Width: 9}}),
-	))
+	client, err := NewVeracodeClient()
+	if err != nil {
+		fmt.Print(renderErrors(err))
+		return err
+	}
+
+	ctx := context.Background()
+
+	p := tea.NewProgram(PrepareReportCard(c))
 
 	for k, app := range c.Applications {
 		go func() {
-			packageAndUploadApplication(uploaderPath, app, k, p)
+			packageAndUploadApplication(uploaderPath, app, k, p, client, ctx)
 		}()
 	}
 
@@ -595,23 +558,7 @@ func refreshCredentials(cCtx *cli.Context) error {
 		return err
 	}
 
-	key, secret, err := veracode.LoadVeracodeCredentials()
-	if err != nil {
-		fmt.Print(renderErrors(err))
-		return err
-	}
-
-	jar, err := cookiejar.New(&cookiejar.Options{})
-	if err != nil {
-		fmt.Print(renderErrors(err))
-		return err
-	}
-
-	httpClient := &http.Client{
-		Jar: jar,
-	}
-
-	client, err := veracode.NewClient(httpClient, key, secret)
+	client, err := NewVeracodeClient()
 	if err != nil {
 		fmt.Print(renderErrors(err))
 		return err
@@ -700,49 +647,6 @@ func VersionPrinter(cCtx *cli.Context) {
 	)
 
 	tea.NewProgram(m).Run()
-}
-
-func PrepareReportCard(c Config) reportcard.Model {
-	var totalPromoting, totalPolicy int
-
-	for k := range c.Applications {
-		switch c.Applications[k].ScanType {
-		case ScanTypePolicy, ScanTypeSandbox:
-			totalPolicy++
-		case ScanTypePromote:
-			totalPromoting++
-		}
-	}
-
-	var columnsOption []reportcard.Column
-	var rowsOption []reportcard.Row
-
-	if totalPromoting > 0 && totalPolicy == 0 {
-		columnsOption = []reportcard.Column{{Name: "Promote", Width: 7}}
-		rowsOption = appsToRows(c.Applications, columnOptionsPromote)
-
-	} else if totalPromoting == 0 && totalPolicy > 0 {
-		columnsOption = []reportcard.Column{{Name: "Package", Width: 7}, {Name: "Scan", Width: 4}, {Name: "Cleanup", Width: 7}}
-		rowsOption = appsToRows(c.Applications, columnOptionsStandard)
-
-	} else {
-		columnsOption = []reportcard.Column{{Name: "Package", Width: 7}, {Name: "Scan", Width: 4}, {Name: "Cleanup", Width: 7}, {Name: "Promote", Width: 7}}
-		rowsOption = appsToRows(c.Applications, columnOptionsMixed)
-	}
-
-	return reportcard.NewModel(
-		reportcard.WithSpinner(defaultSpinnerOpts...),
-		reportcard.WithStyles(reportcard.Styles{
-			NameHeader:  lipgloss.NewStyle().Bold(true).Padding(0, 1),
-			TaskHeaders: lipgloss.NewStyle().Bold(true).Padding(0, 1),
-			Cell:        lipgloss.NewStyle().Padding(0, 1),
-			Border:      lipgloss.NewStyle().BorderStyle(lipgloss.RoundedBorder()).BorderForeground(darkGray).Padding(0, 2).MarginLeft(2),
-			Selected:    lipgloss.NewStyle().Foreground(lightBlue),
-		}),
-		reportcard.WithData(rowsOption),
-		reportcard.WithTasks(columnsOption),
-		reportcard.WithPrefixColumns([]reportcard.Column{{Name: "Scan Type", Width: 9}}),
-	)
 }
 
 func RemoveBadApps(c *Config, badApps []*Options) {

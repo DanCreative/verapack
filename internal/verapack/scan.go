@@ -4,112 +4,77 @@ import (
 	"github.com/DanCreative/verapack/internal/components/reportcard"
 )
 
-type columnOptions int
-
 const (
-	columnOptionsStandard columnOptions = iota
-	columnOptionsPromote
-	columnOptionsMixed
+	columnPromote string = "Promote"
+	columnPackage string = "Package"
+	columnCleanup string = "Cleanup"
+	columnResult  string = "Result"
+	columnUpload  string = "Upload"
+	columnPolicy  string = "Policy"
 )
 
-func appsToRows(applications []Options, columnOptions columnOptions) []reportcard.Row {
+func appsToRows(applications []Options, columns []reportcard.Column) []reportcard.Row {
 	rows := make([]reportcard.Row, 0, len(applications))
 
 	for _, application := range applications {
-		var row reportcard.Row
-		switch columnOptions {
-		case columnOptionsStandard:
-			row = standardRow(application)
-		case columnOptionsPromote:
-			row = promoteRow(application)
-		case columnOptionsMixed:
-			row = mixedRow(application)
+		row := reportcard.Row{
+			Name:         application.AppName,
+			PrefixValues: []string{string(application.ScanType)},
+			Tasks:        setTaskStatuses(application, columns),
 		}
+
 		rows = append(rows, row)
 	}
 
 	return rows
 }
 
-func standardRow(application Options) reportcard.Row {
-	row := reportcard.Row{
-		Name: application.AppName,
-		// Package, Scan, Cleanup
-		Tasks: []reportcard.Task{
-			{Status: reportcard.NotStarted},
-			{Status: reportcard.NotStarted},
-			// Cleanup should show "running" even if scan fails, but not if packaging fails.
-			{Status: reportcard.NotStarted, ShouldRunAnywayFor: map[int]bool{1: true}},
-		},
-		PrefixValues: []string{string(application.ScanType)},
+func setTaskStatuses(application Options, columns []reportcard.Column) []reportcard.Task {
+	tasks := make([]reportcard.Task, len(columns))
+
+	for k := range tasks {
+		tasks[k].Status = reportcard.NotStarted
 	}
 
-	if application.PackageSource == "" {
-		// If PackageSource is empty, indicate that packaging task will be skipped
-		row.Tasks[0].Status = reportcard.Skip
-	}
+	for k, col := range columns {
+		switch application.ScanType {
+		case ScanTypeSandbox, ScanTypePolicy:
+			if col.Name == columnPromote {
+				// The Promote task is not applicable to sandbox or policy scans.
+				tasks[k].Status = reportcard.Skip
+			}
 
-	if !*application.AutoCleanup || application.PackageSource == "" {
-		// If AutoCleanup is false, indicate that cleanup task will be skipped
-		row.Tasks[2].Status = reportcard.Skip
-	}
-	return row
-}
+			if col.Name == columnPackage && application.PackageSource == "" {
+				// If PackageSource is empty, indicate that packaging task will be skipped.
+				tasks[k].Status = reportcard.Skip
+			}
 
-func promoteRow(application Options) reportcard.Row {
-	row := reportcard.Row{
-		Name: application.AppName,
-		// Promote
-		Tasks: []reportcard.Task{
-			{Status: reportcard.NotStarted},
-		},
-		PrefixValues: []string{string(application.ScanType)},
-	}
+			if col.Name == columnCleanup {
+				if !*application.AutoCleanup || application.PackageSource == "" {
+					// If AutoCleanup is false or user is not using the auto-packager, indicate that cleanup task will be skipped.
+					tasks[k].Status = reportcard.Skip
+				} else {
+					// Cleanup is run after the packaging and upload completes, regardless of whether those tasks are successful.
+					tasks[k].ShouldRunAnywayFor = map[int]bool{0: true, 1: true}
+				}
+			}
 
-	return row
-}
+			if col.Name == columnResult && !application.WaitForResult {
+				// For applications where wait_for_results is set to false, indicate that it will be skipped.
+				tasks[k].Status = reportcard.Skip
+			}
 
-func mixedRow(application Options) reportcard.Row {
-	var row reportcard.Row
+			if col.Name == columnPolicy && (!application.WaitForResult || application.ScanType == ScanTypeSandbox) {
+				// For applications where wait_for_results is set to false or that are not Policy scans, indicate that it will be skipped.
+				tasks[k].Status = reportcard.Skip
+			}
 
-	switch application.ScanType {
-	case ScanTypeSandbox, ScanTypePolicy:
-		row = reportcard.Row{
-			Name: application.AppName,
-			// Package, Scan, Cleanup, Promote
-			Tasks: []reportcard.Task{
-				{Status: reportcard.NotStarted},
-				{Status: reportcard.NotStarted},
-				// Cleanup should show "running" even if scan fails, but not if packaging fails.
-				{Status: reportcard.NotStarted, ShouldRunAnywayFor: map[int]bool{1: true}},
-				{Status: reportcard.Skip},
-			},
-			PrefixValues: []string{string(application.ScanType)},
-		}
-
-		if application.PackageSource == "" {
-			// If PackageSource is empty, indicate that packaging task will be skipped
-			row.Tasks[0].Status = reportcard.Skip
-		}
-
-		if !*application.AutoCleanup || application.PackageSource == "" {
-			// If AutoCleanup is false, indicate that cleanup task will be skipped
-			row.Tasks[2].Status = reportcard.Skip
-		}
-	case ScanTypePromote:
-		row = reportcard.Row{
-			Name: application.AppName,
-			// Package, Scan, Cleanup, Promote
-			Tasks: []reportcard.Task{
-				{Status: reportcard.Skip},
-				{Status: reportcard.Skip},
-				// Cleanup should show "running" even if scan fails, but not if packaging fails.
-				{Status: reportcard.Skip},
-				{Status: reportcard.NotStarted},
-			},
-			PrefixValues: []string{string(application.ScanType)},
+		case ScanTypePromote:
+			if col.Name == columnPackage || col.Name == columnCleanup || col.Name == columnResult || col.Name == columnUpload || col.Name == columnPolicy {
+				tasks[k].Status = reportcard.Skip
+			}
 		}
 	}
 
-	return row
+	return tasks
 }

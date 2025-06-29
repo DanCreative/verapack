@@ -46,16 +46,11 @@ type Options struct {
 	SandboxId   int    `yaml:"-"`            // ID of the sandbox in which to run the scan. Application will determine the sandbox id from the provided sandbox name.
 	SandboxGuid string `yaml:"-"`            // GUID of the sandbox in which to run the scan.
 	AppGuid     string `yaml:"-"`            // GUID of the application profile.
+	AppId       int    `yaml:"-"`
 
-	// Number of minutes to wait for the scan to complete and pass policy.
-	// If the scan does not complete or fails policy, the build fails.
-	//
-	// Set the value to 0 to "fire-and-forget".
-	ScanTimeout int `yaml:"scan_timeout"`
-
-	// Interval, in seconds, to poll for the status of a running scan.
-	// Value range is 30 to 120 (two minutes). Default is 120.
-	ScanPollingInterval int `yaml:"scan_polling_interval" validate:"omitempty,min=30,max=120"`
+	WaitForResult       bool `yaml:"wait_for_result"`       // Wait for the results of the scan.
+	ScanTimeout         int  `yaml:"scan_timeout"`          // Number of minutes to wait for the scan to complete and pass policy.
+	ScanPollingInterval int  `yaml:"scan_polling_interval"` // Interval, in seconds, to poll for the status of a running scan.
 
 	// Packaging Options
 
@@ -138,9 +133,27 @@ func SetDefaults(configBytes []byte) (Config, error) {
 		if err = mergo.Merge(&c.Applications[i], c.Default, mergo.WithoutDereference); err != nil {
 			return Config{}, err
 		}
+
+		setPostMergeDefaults(&c.Applications[i])
 	}
 
 	return c, nil
+}
+
+func setPostMergeDefaults(options *Options) {
+	if options.WaitForResult {
+		if options.ScanTimeout <= 0 {
+			options.ScanTimeout = 120
+		}
+
+		if options.ScanPollingInterval < 30 {
+			options.ScanPollingInterval = 30
+		}
+
+		if options.ScanPollingInterval > 120 {
+			options.ScanPollingInterval = 120
+		}
+	}
 }
 
 // setDynamicDefaults sets any default values that are based on dynamic values.

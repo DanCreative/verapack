@@ -1,24 +1,27 @@
 default:
-  type: directory
+  type: repo
   sandbox_name: Dev
   auto_cleanup: true
+  wait_for_result: true
 
 applications:
   - app_name: The Vera & the Demo                 
-    package_source: C:\app\source 
+    package_source: https://github.com/DanCreative/verapack
   - app_name: 2 Vera 2 Demo                
-    package_source: C:\app\source 
+    package_source: https://github.com/DanCreative/verapack
+  - app_name: "Vera & Demo: Tokyo Drift"              
+    package_source: https://github.com/DanCreative/verapack 
   - app_name: Vera & Demo               
-    package_source: C:\app\source 
-  - app_name: Vera 5              
-    package_source: C:\app\source 
+    package_source: https://github.com/DanCreative/verapack
+  - app_name: Vera five              
+    package_source: https://github.com/DanCreative/verapack
   - app_name: Vera & Demo 6                
-    package_source: C:\app\source 
-  - app_name: Vera & Demo 6                
-    package_source: C:\app\source 
-  - app_name: Vera & Demo Tokyo Drift              
-    package_source: C:\app\source 
+    package_source: https://github.com/DanCreative/verapack 
   - app_name: Demo 7          
-    package_source: C:\app\source 
+    package_source: https://github.com/DanCreative/verapack 
   - app_name: The fate of the demo         
-    package_source: C:\app\source 
+    package_source: https://github.com/DanCreative/verapack 
+  - app_name: D9         
+    package_source: https://github.com/DanCreative/verapack
+  - app_name: Vera X         
+    package_source: https://github.com/DanCreative/verapack

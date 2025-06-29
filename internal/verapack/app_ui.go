@@ -141,9 +141,7 @@ func Sandbox_ui(cCtx *cli.Context) error {
 	server := newVeracodeMockServer(c)
 	defer server.Close()
 
-	httpClient := newVeracodeMockClient(strings.Replace(server.URL, "https://", "", 1))
-
-	client, err := veracode.NewClient(httpClient, "", "")
+	client, err := newVeracodeMockClient(strings.Replace(server.URL, "https://", "", 1))
 	if err != nil {
 		fmt.Print(renderErrors(err))
 		return err
@@ -252,7 +250,7 @@ func Sandbox_ui(cCtx *cli.Context) error {
 					// TODO
 					// promoteSandbox(client, ctx, app, k, p)
 				} else {
-					packageAndUploadApplication_ui(app, k, p)
+					packageAndUploadApplication_ui(app, k, p, client, ctx)
 				}
 			}()
 		}
@@ -273,15 +271,9 @@ func Sandbox_ui(cCtx *cli.Context) error {
 	return nil
 }
 
-func packageAndUploadApplication_ui(options Options, appId int, reporter reporter) {
+func packageAndUploadApplication_ui(options Options, appId int, reporter reporter, client *veracode.Client, ctx context.Context) {
+	// Package
 	if options.PackageSource != "" {
-		defer func() {
-			reporter.Send(reportcard.TaskResultMsg{
-				Status: reportcard.Success,
-				Index:  appId,
-			})
-		}()
-
 		if appId > 1 {
 			time.Sleep(time.Duration(rand.IntN(5)+1) * time.Second)
 		}
@@ -292,88 +284,130 @@ func packageAndUploadApplication_ui(options Options, appId int, reporter reporte
 				Index:   appId,
 				IsFatal: true,
 				Output: `Veracode CLI v2.40.0 -- 8823f61
-Please ensure your project builds successfully without any errors.
+	Please ensure your project builds successfully without any errors.
 
-Packaging code for project verademo. Please wait; this may take a while...
+	Packaging code for project verademo. Please wait; this may take a while...
 
-Verifying source project language ...
-Copying Java artifacts for MavenPackager project. Build failed, please run with --verbose flag for more details.
-Packaging generic Javascript artifact for no-pm project.
-Javascript project verademo packaged to: path\to\out\veracode-auto-pack-verademo-js-no-pm.zip
-[GenericPackagerSQL] Packaging succeeded for the path path\to\temp-clone_448303049\verademo.
-. Please check the verbose information for more details.ject path\to\temp-clone_448303049\verademo\app
-This may result in reduced analysis scope, quality or performance.
-Successfully created 2 artifact(s).
-[INFO] SUMMARY - Javascript (GenericPackagerJS): "path\to\out\veracode-auto-pack-verademo-js-no-pm.zip"  (Size: 123.0KB, SHA2: 124d7a22689101b8327e9b73b96f83d12e36a4cba391i621a690878a871967ed)
-[INFO] SUMMARY - SQL (GenericPackagerSQL): "path\to\out\veracode-auto-pack-verademo-sql.zip"  (Size: 12.6KB, SHA2: 8ab8eedd60fc0353152473e68bf190c8bc4d3444cd068dc95a06269fd4a79d72)
-Total time taken to complete command: 46.724s`,
+	Verifying source project language ...
+	Copying Java artifacts for MavenPackager project. Build failed, please run with --verbose flag for more details.
+	Packaging generic Javascript artifact for no-pm project.
+	Javascript project verademo packaged to: path\to\out\veracode-auto-pack-verademo-js-no-pm.zip
+	[GenericPackagerSQL] Packaging succeeded for the path path\to\temp-clone_448303049\verademo.
+	. Please check the verbose information for more details.ject path\to\temp-clone_448303049\verademo\app
+	This may result in reduced analysis scope, quality or performance.
+	Successfully created 2 artifact(s).
+	[INFO] SUMMARY - Javascript (GenericPackagerJS): "path\to\out\veracode-auto-pack-verademo-js-no-pm.zip"  (Size: 123.0KB, SHA2: 124d7a22689101b8327e9b73b96f83d12e36a4cba391i621a690878a871967ed)
+	[INFO] SUMMARY - SQL (GenericPackagerSQL): "path\to\out\veracode-auto-pack-verademo-sql.zip"  (Size: 12.6KB, SHA2: 8ab8eedd60fc0353152473e68bf190c8bc4d3444cd068dc95a06269fd4a79d72)
+	Total time taken to complete command: 46.724s`,
 			})
 		} else {
 			reporter.Send(reportcard.TaskResultMsg{
 				Status: reportcard.Success,
 				Index:  appId,
 				Output: `Veracode CLI v2.40.0 -- 8823f61
-Please ensure your project builds successfully without any errors.
+	Please ensure your project builds successfully without any errors.
 
-Packaging code for project verademo. Please wait; this may take a while...
+	Packaging code for project verademo. Please wait; this may take a while...
 
-Verifying source project language ...
-Copying Java artifacts for MavenPackager project. Build failed, please run with --verbose flag for more details.
-Packaging generic Javascript artifact for no-pm project.
-Javascript project verademo packaged to: path\to\out\veracode-auto-pack-verademo-js-no-pm.zip
-[GenericPackagerSQL] Packaging succeeded for the path path\to\temp-clone_448303049\verademo.
-. Please check the verbose information for more details.ject path\to\temp-clone_448303049\verademo\app
-This may result in reduced analysis scope, quality or performance.
-Successfully created 2 artifact(s).
-[INFO] SUMMARY - Javascript (GenericPackagerJS): "path\to\out\veracode-auto-pack-verademo-js-no-pm.zip"  (Size: 123.0KB, SHA2: 124d7a22689101b8327e9c73b96f83d12e36a4cba391f621a690878a871967ed)
-[INFO] SUMMARY - SQL (GenericPackagerSQL): "path\to\out\veracode-auto-pack-verademo-sql.zip"  (Size: 12.6KB, SHA2: 8ab8eedd60fc0353152473e68bf190a8ba4d3444cd068dc95a06269fd4b79d72)
-Total time taken to complete command: 46.724s`,
+	Verifying source project language ...
+	Copying Java artifacts for MavenPackager project. Build failed, please run with --verbose flag for more details.
+	Packaging generic Javascript artifact for no-pm project.
+	Javascript project verademo packaged to: path\to\out\veracode-auto-pack-verademo-js-no-pm.zip
+	[GenericPackagerSQL] Packaging succeeded for the path path\to\temp-clone_448303049\verademo.
+	. Please check the verbose information for more details.ject path\to\temp-clone_448303049\verademo\app
+	This may result in reduced analysis scope, quality or performance.
+	Successfully created 2 artifact(s).
+	[INFO] SUMMARY - Javascript (GenericPackagerJS): "path\to\out\veracode-auto-pack-verademo-js-no-pm.zip"  (Size: 123.0KB, SHA2: 124d7a22689101b8327e9c73b96f83d12e36a4cba391f621a690878a871967ed)
+	[INFO] SUMMARY - SQL (GenericPackagerSQL): "path\to\out\veracode-auto-pack-verademo-sql.zip"  (Size: 12.6KB, SHA2: 8ab8eedd60fc0353152473e68bf190a8ba4d3444cd068dc95a06269fd4b79d72)
+	Total time taken to complete command: 46.724s`,
 			})
 		}
 	}
 
-	if appId > 1 {
+	if appId > 0 {
 		time.Sleep(time.Duration(rand.IntN(3)) * time.Second)
 	}
 
-	if appId > 1 && rand.IntN(4)+1 == 1 {
+	// Upload
+	if appId > 0 && rand.IntN(4)+1 == 1 {
 		reporter.Send(reportcard.TaskResultMsg{
 			Status:  reportcard.Failure,
 			Index:   appId,
 			IsFatal: true,
 			Output: `[2025.06.01 19:12:26.380] Transaction ID: [123-123-123-124]
-[2025.06.01 19:12:28.940] 
-[2025.06.01 19:12:28.940] Application profile "Verademo" (appid=0) was located.
-[2025.06.01 19:12:28.940] 
-[2025.06.01 19:12:28.940] Creating a new analysis with name "25.0.0".
-[2025.06.01 19:12:29.707] 
-[2025.06.01 19:12:29.707] * Action "UploadAndScan" returned the following message:
-[2025.06.01 19:12:29.707] * The version 25.0.0 already exists
-[2025.06.01 19:12:29.707]
-[2025.06.01 19:12:31.055] Scan status is Results Ready
-[2025.06.01 19:12:31.057] 
-[2025.06.01 19:12:31.057] * A scan has failed to complete successfully. Delete the failed scan from the Veracode Platform and try again.`,
+	[2025.06.01 19:12:28.940]
+	[2025.06.01 19:12:28.940] Application profile "Verademo" (appid=0) was located.
+	[2025.06.01 19:12:28.940]
+	[2025.06.01 19:12:28.940] Creating a new analysis with name "25.0.0".
+	[2025.06.01 19:12:29.707]
+	[2025.06.01 19:12:29.707] * Action "UploadAndScan" returned the following message:
+	[2025.06.01 19:12:29.707] * The version 25.0.0 already exists
+	[2025.06.01 19:12:29.707]
+	[2025.06.01 19:12:31.055] Scan status is Results Ready
+	[2025.06.01 19:12:31.057]
+	[2025.06.01 19:12:31.057] * A scan has failed to complete successfully. Delete the failed scan from the Veracode Platform and try again.`,
 		})
 	} else {
 		reporter.Send(reportcard.TaskResultMsg{
 			Status: reportcard.Success,
 			Index:  appId,
 			Output: `[2025.06.01 19:10:36.383] Transaction ID: [123-123-123-123]
-[2025.06.01 19:10:39.543] 
-[2025.06.01 19:10:39.543] Application profile "Verademo" (appid=0) was located.
-[2025.06.01 19:10:39.544] 
-[2025.06.01 19:10:39.544] Creating a new analysis with name "25.0.0".
-[2025.06.01 19:10:41.788] 
-[2025.06.01 19:10:41.788] The analysis id of the new analysis is "0".
-[2025.06.01 19:10:41.789] 
-[2025.06.01 19:10:41.789] Uploading: path\to\out\veracode-auto-pack-verademo-js-no-pm.zip
-[2025.06.01 19:10:43.311] 
-[2025.06.01 19:10:43.311] Starting pre-scan verification for application "Verademo" analysis "25.0.0".
-[2025.06.01 19:10:44.948] 
-[2025.06.01 19:10:44.948] Scan polling interval is set to the default of 120 seconds.
-[2025.06.01 19:10:44.949] 
-[2025.06.01 19:10:44.949] Application "Verademo" analysis "25.0.0" will be automatically submitted for scanning if the pre-scan verification is successful.`,
+	[2025.06.01 19:10:39.543]
+	[2025.06.01 19:10:39.543] Application profile "Verademo" (appid=0) was located.
+	[2025.06.01 19:10:39.544]
+	[2025.06.01 19:10:39.544] Creating a new analysis with name "25.0.0".
+	[2025.06.01 19:10:41.788]
+	[2025.06.01 19:10:41.788] The analysis id of the new analysis is "0".
+	[2025.06.01 19:10:41.789]
+	[2025.06.01 19:10:41.789] Uploading: path\to\out\veracode-auto-pack-verademo-js-no-pm.zip
+	[2025.06.01 19:10:43.311]
+	[2025.06.01 19:10:43.311] Starting pre-scan verification for application "Verademo" analysis "25.0.0".
+	[2025.06.01 19:10:44.948]
+	[2025.06.01 19:10:44.948] Scan polling interval is set to the default of 120 seconds.
+	[2025.06.01 19:10:44.949]
+	[2025.06.01 19:10:44.949] Application "Verademo" analysis "25.0.0" will be automatically submitted for scanning if the pre-scan verification is successful.`,
 		})
+	}
+
+	// Cleanup
+	reporter.Send(reportcard.TaskResultMsg{
+		Status: reportcard.Success,
+		Index:  appId,
+	})
+
+	// Result & Policy
+	if options.WaitForResult {
+		time.Sleep(time.Duration(rand.IntN(5)+1) * time.Second)
+		if appId > 0 && rand.IntN(2) == 1 {
+			reporter.Send(reportcard.TaskResultMsg{
+				Status:              reportcard.Success,
+				Index:               appId,
+				CustomSuccessStatus: createCustomTaskStatusFromResult(result{PassedPolicy: true, PolicyStatus: ""}, false),
+			})
+
+			if options.ScanType == ScanTypePolicy {
+				reporter.Send(reportcard.TaskResultMsg{
+					Status:              reportcard.Success,
+					Index:               appId,
+					CustomSuccessStatus: createCustomTaskStatusFromResult(result{PassedPolicy: false, PolicyStatus: "Pass"}, true),
+				})
+			}
+
+		} else {
+			reporter.Send(reportcard.TaskResultMsg{
+				Status:              reportcard.Success,
+				Index:               appId,
+				CustomSuccessStatus: createCustomTaskStatusFromResult(result{PassedPolicy: false, PolicyStatus: ""}, false),
+			})
+
+			if options.ScanType == ScanTypePolicy {
+				reporter.Send(reportcard.TaskResultMsg{
+					Status:              reportcard.Success,
+					Index:               appId,
+					CustomSuccessStatus: createCustomTaskStatusFromResult(result{PassedPolicy: false, PolicyStatus: "Conditional Pass"}, true),
+				})
+			}
+		}
 	}
 }
 
@@ -389,9 +423,7 @@ func Promote_ui(cCtx *cli.Context) error {
 	server := newVeracodeMockServer(c)
 	defer server.Close()
 
-	httpClient := newVeracodeMockClient(strings.Replace(server.URL, "https://", "", 1))
-
-	client, err := veracode.NewClient(httpClient, "", "")
+	client, err := newVeracodeMockClient(strings.Replace(server.URL, "https://", "", 1))
 	if err != nil {
 		fmt.Print(renderErrors(err))
 		return err
@@ -570,7 +602,7 @@ func Promote_ui(cCtx *cli.Context) error {
 				if app.ScanType == ScanTypePromote {
 					promoteSandbox(client, ctx, app, k, p)
 				} else {
-					packageAndUploadApplication_ui(app, k, p)
+					packageAndUploadApplication_ui(app, k, p, client, ctx)
 				}
 			}()
 		}
@@ -605,27 +637,27 @@ func Policy_ui(cCtx *cli.Context) error {
 		return err
 	}
 
+	ctx := context.Background()
+
+	// Setup mock http server and client
+	server := newVeracodeMockServer(c)
+	defer server.Close()
+
+	client, err := newVeracodeMockClient(strings.Replace(server.URL, "https://", "", 1))
+	if err != nil {
+		fmt.Print(renderErrors(err))
+		return err
+	}
+
 	for k := range c.Applications {
 		c.Applications[k].ScanType = ScanTypePolicy
 	}
 
-	p := tea.NewProgram(reportcard.NewModel(
-		reportcard.WithSpinner(defaultSpinnerOpts...),
-		reportcard.WithStyles(reportcard.Styles{
-			NameHeader:  lipgloss.NewStyle().Bold(true).Padding(0, 1),
-			TaskHeaders: lipgloss.NewStyle().Bold(true).Padding(0, 1),
-			Cell:        lipgloss.NewStyle().Padding(0, 1),
-			Border:      lipgloss.NewStyle().BorderStyle(lipgloss.RoundedBorder()).BorderForeground(darkGray).Padding(0, 2).MarginLeft(2),
-			Selected:    lipgloss.NewStyle().Foreground(lightBlue),
-		}),
-		reportcard.WithData(appsToRows(c.Applications, columnOptionsStandard)),
-		reportcard.WithTasks([]reportcard.Column{{Name: "Package", Width: 7}, {Name: "Scan", Width: 4}, {Name: "Cleanup", Width: 7}}),
-		reportcard.WithPrefixColumns([]reportcard.Column{{Name: "Scan Type", Width: 9}}),
-	))
+	p := tea.NewProgram(PrepareReportCard(c))
 
 	for k, app := range c.Applications {
 		go func() {
-			packageAndUploadApplication_ui(app, k, p)
+			packageAndUploadApplication_ui(app, k, p, client, ctx)
 		}()
 	}
 
@@ -652,9 +684,7 @@ func RefreshCredentials_ui(cCtx *cli.Context) error {
 	server := newVeracodeMockServer(c)
 	defer server.Close()
 
-	httpClient := newVeracodeMockClient(strings.Replace(server.URL, "https://", "", 1))
-
-	client, err := veracode.NewClient(httpClient, "", "")
+	client, err := newVeracodeMockClient(strings.Replace(server.URL, "https://", "", 1))
 	if err != nil {
 		fmt.Print(renderErrors(err))
 		return err

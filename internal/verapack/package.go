@@ -74,7 +74,7 @@ func cloneOptionsToArgs(options Options, outputDirPath string) []string {
 func PackageApplication(options Options, outputDirPath string, writer io.Writer) ([]string, string, error) {
 	path, err := exec.LookPath("veracode")
 	if err != nil {
-		return nil, "", err
+		return nil, err.Error(), err
 	}
 
 	cmd := exec.Command(path, packageOptionsToArgs(options, outputDirPath)...)
