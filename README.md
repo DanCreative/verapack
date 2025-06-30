@@ -57,11 +57,11 @@ Once the setup has completed successfully, it will show you where the config fil
 
 The config file is in YAML format, and is structured like below. Please see an example template file [here](https://github.com/DanCreative/verapack/tree/main/internal/verapack/config.yaml).
 
-#### Config file YAML Schema
+<br>
 
 <details>
 
-<summary>Click here to expand</summary>
+<summary>Config file YAML Schema</summary>
 
 <br>
 
@@ -92,6 +92,8 @@ scan_timeout | $${\color{orange}int}$$ | false | Number of minutes to wait for t
 scan_polling_interval | $${\color{orange}int}$$ | false | Interval, in seconds, to poll for the status of a running scan. Only applicable when ```wait_for_result``` is set. The value can be between: 30 - 120. The default value is: 30
 
 </details>
+
+<br>
 
 ### 3. Scanning
 
