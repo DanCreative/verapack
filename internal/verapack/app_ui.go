@@ -370,13 +370,60 @@ func packageAndUploadApplication_ui(options Options, appId int, reporter reporte
 	}
 
 	// Cleanup
-	reporter.Send(reportcard.TaskResultMsg{
-		Status: reportcard.Success,
-		Index:  appId,
-	})
+	if *options.AutoCleanup {
+		reporter.Send(reportcard.TaskResultMsg{
+			Status: reportcard.Success,
+			Index:  appId,
+		})
+	}
+
+	shouldAutoPromote := options.AutoPromote && options.ScanType == ScanTypeSandbox
+
+	// Result, Promote & Policy
+	if shouldAutoPromote {
+		time.Sleep(time.Duration(rand.IntN(5)+1) * time.Second)
+		res := result{PassedPolicy: appId == 0 || rand.IntN(4) > 0}
+
+		if p := rand.IntN(3); p == 0 {
+			res.PolicyStatus = "Did Not Pass"
+		} else if p == 1 {
+			res.PolicyStatus = "Pass"
+		} else {
+			res.PolicyStatus = "Conditional Pass"
+		}
+
+		// Result
+		reporter.Send(reportcard.TaskResultMsg{
+			Status:              reportcard.Success,
+			Index:               appId,
+			CustomSuccessStatus: createCustomTaskStatusFromResult(res, false),
+		})
+
+		// Promote
+		if res.PassedPolicy {
+			reporter.Send(reportcard.TaskResultMsg{
+				Status: reportcard.Success,
+				Index:  appId,
+			})
+		} else {
+			reporter.Send(reportcard.TaskResultMsg{
+				Status:  reportcard.Failure,
+				Index:   appId,
+				IsFatal: true,
+				Output:  "The application did not pass the policy rules. Therefore auto-promotion was cancelled.",
+			})
+		}
+
+		// Policy
+		reporter.Send(reportcard.TaskResultMsg{
+			Status:              reportcard.Success,
+			Index:               appId,
+			CustomSuccessStatus: createCustomTaskStatusFromResult(res, true),
+		})
+	}
 
 	// Result & Policy
-	if options.WaitForResult {
+	if options.WaitForResult && !shouldAutoPromote {
 		time.Sleep(time.Duration(rand.IntN(5)+1) * time.Second)
 		if appId > 0 && rand.IntN(2) == 1 {
 			reporter.Send(reportcard.TaskResultMsg{

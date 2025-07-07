@@ -39,11 +39,6 @@ func setTaskStatuses(application Options, columns []reportcard.Column) []reportc
 	for k, col := range columns {
 		switch application.ScanType {
 		case ScanTypeSandbox, ScanTypePolicy:
-			if col.Name == columnPromote {
-				// The Promote task is not applicable to sandbox or policy scans.
-				tasks[k].Status = reportcard.Skip
-			}
-
 			if col.Name == columnPackage && application.PackageSource == "" {
 				// If PackageSource is empty, indicate that packaging task will be skipped.
 				tasks[k].Status = reportcard.Skip
@@ -59,13 +54,18 @@ func setTaskStatuses(application Options, columns []reportcard.Column) []reportc
 				}
 			}
 
-			if col.Name == columnResult && !application.WaitForResult {
+			if col.Name == columnResult && !application.WaitForResult && !application.AutoPromote {
 				// For applications where wait_for_results is set to false, indicate that it will be skipped.
 				tasks[k].Status = reportcard.Skip
 			}
 
-			if col.Name == columnPolicy && (!application.WaitForResult || application.ScanType == ScanTypeSandbox) {
-				// For applications where wait_for_results is set to false or that are not Policy scans, indicate that it will be skipped.
+			if col.Name == columnPolicy && (!application.WaitForResult || application.ScanType == ScanTypeSandbox) && (!application.AutoPromote || application.ScanType == ScanTypePolicy) {
+				// For applications where wait_for_results is set to false or that are Policy scans, indicate that it will be skipped.
+				tasks[k].Status = reportcard.Skip
+			}
+
+			if col.Name == columnPromote && (!application.AutoPromote || application.ScanType == ScanTypePolicy) {
+				// For applications where auto_promote is set to false or sandbox scans, indicate that it will be skipped.
 				tasks[k].Status = reportcard.Skip
 			}
 

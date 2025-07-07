@@ -110,7 +110,16 @@ func packageAndUploadApplication(uploaderPath string, options Options, appId int
 
 	cleanupTask(options, packageOutputBaseDirectory, appId, reporter)
 
-	if options.WaitForResult {
+	shouldAutoPromote := options.AutoPromote && options.ScanType == ScanTypeSandbox
+
+	if shouldAutoPromote {
+		err = autoPromoteTask(ctx, client, options, appId, reporter)
+		if err != nil {
+			return err
+		}
+	}
+
+	if options.WaitForResult && !shouldAutoPromote {
 		err = waitForResultTask(ctx, client, options, appId, reporter)
 		if err != nil {
 			return err
@@ -168,6 +177,82 @@ func waitForResultTask(ctx context.Context, client *veracode.Client, options Opt
 	}
 
 	return nil
+}
+
+func autoPromoteTask(ctx context.Context, client *veracode.Client, options Options, appId int, reporter reporter) error {
+	res, out, err := WaitForResult(ctx, client, options, reporter)
+	if err != nil {
+		reporter.Send(reportcard.TaskResultMsg{
+			Status:  reportcard.Failure,
+			Output:  out,
+			Index:   appId,
+			IsFatal: true,
+		})
+
+		return err
+	}
+
+	// Result column
+	taskResult := reportcard.TaskResultMsg{
+		Status:              reportcard.Success,
+		Output:              out,
+		Index:               appId,
+		CustomSuccessStatus: createCustomTaskStatusFromResult(res, false),
+	}
+
+	reporter.Send(taskResult)
+
+	// Promote column
+	if res.PassedPolicy {
+		_, _, err := client.Sandbox.PromoteSandbox(ctx, options.AppGuid, options.SandboxGuid, true)
+		if err != nil {
+			reporter.Send(reportcard.TaskResultMsg{
+				Status:  reportcard.Failure,
+				Index:   appId,
+				Output:  err.Error(),
+				IsFatal: true,
+			})
+			return err
+		}
+
+		reporter.Send(reportcard.TaskResultMsg{
+			Status: reportcard.Success,
+			Index:  appId,
+		})
+
+	} else {
+		reporter.Send(reportcard.TaskResultMsg{
+			Status:  reportcard.Failure,
+			Index:   appId,
+			Output:  "The application did not pass the policy rules. Therefore auto-promotion was cancelled.",
+			IsFatal: true,
+		})
+
+		return nil
+	}
+
+	// Policy column
+	summaryReport, _, err := client.Application.GetSummaryReport(ctx, options.AppGuid, veracode.SummaryReportOptions{})
+	if err != nil {
+		reporter.Send(reportcard.TaskResultMsg{
+			Status:  reportcard.Failure,
+			Index:   appId,
+			Output:  err.Error(),
+			IsFatal: true,
+		})
+		return err
+	}
+
+	res = result{PassedPolicy: summaryReport.PolicyRulesStatus == "Pass", PolicyStatus: summaryReport.PolicyComplianceStatus}
+
+	reporter.Send(reportcard.TaskResultMsg{
+		Status:              reportcard.Success,
+		Index:               appId,
+		CustomSuccessStatus: createCustomTaskStatusFromResult(res, true),
+	})
+
+	return nil
+
 }
 
 func createCustomTaskStatusFromResult(result result, isPolicyStatus bool) reportcard.CustomTaskStatus {
