@@ -86,6 +86,7 @@ type | $${\color{lightblue}string}$$ | false | Specifies the target type you wan
 strict | $${\color{pink}bool}$$ | false | If this field is true, the packaging step will fail on application build failure.
 create_profile | $${\color{pink}bool}$$ | false | Create a new application profile if one with the name set in ```app_name``` does not exist already.
 sandbox_name | $${\color{lightblue}string}$$ | false | Name of the sandbox to use when running a sandbox scan or promoting a sandbox scan. If a sandbox with this name does not exist, it will be created.
+auto_promote | $${\color{pink}bool}$$ | false | If this field is true, sandbox scans will wait for the result, and automatically promote results that pass, to the policy scan for the application profile.
 version | $${\color{lightblue}string}$$ | false | Name or version of the build that you want to scan. This will be used as the scan name. If omitted, the current date-time in this format: "02 Jan 2006 15:04PM Static" will be used.
 wait_for_result | $${\color{pink}bool}$$ | false | Wait for the scan to complete and return the status of the scan. ```scan_timeout``` and ```scan_polling_interval``` can optionally be set to customize the behaviour.
 scan_timeout | $${\color{orange}int}$$ | false | Number of minutes to wait for the scan to complete. Only applicable when ```wait_for_result``` is set. The default value is: 120

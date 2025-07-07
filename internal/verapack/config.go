@@ -47,6 +47,7 @@ type Options struct {
 	SandboxGuid string `yaml:"-"`            // GUID of the sandbox in which to run the scan.
 	AppGuid     string `yaml:"-"`            // GUID of the application profile.
 	AppId       int    `yaml:"-"`
+	AutoPromote bool   `yaml:"auto_promote"`
 
 	WaitForResult       bool `yaml:"wait_for_result"`       // Wait for the results of the scan.
 	ScanTimeout         int  `yaml:"scan_timeout"`          // Number of minutes to wait for the scan to complete and pass policy.
@@ -108,17 +109,19 @@ func ReadConfig(filePath string, includeAppNames ...string) (Config, error) {
 		return Config{}, err
 	}
 
-	filteredApps := make([]Options, 0, len(c.Applications))
+	if len(includeAppNames) > 0 {
+		filteredApps := make([]Options, 0, len(c.Applications))
 
-	for _, app1 := range c.Applications {
-		for _, app2 := range includeAppNames {
-			if strings.EqualFold(app1.AppName, app2) {
-				filteredApps = append(filteredApps, app1)
+		for _, app1 := range c.Applications {
+			for _, app2 := range includeAppNames {
+				if strings.EqualFold(app1.AppName, app2) {
+					filteredApps = append(filteredApps, app1)
+				}
 			}
 		}
-	}
 
-	c.Applications = filteredApps
+		c.Applications = filteredApps
+	}
 
 	NewValidator()
 

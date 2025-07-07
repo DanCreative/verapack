@@ -33,24 +33,24 @@ func NewVeracodeClient() (*veracode.Client, error) {
 }
 
 func PrepareReportCard(c Config) reportcard.Model {
-	var somePromoting, someWaiting, somePolicy, someSandbox bool
-	// var totalPromoting, totalPolicy, totalWaiting int
+	var somePromoting, someWaiting, somePolicy, someSandbox, someAutoPromoting bool
 
 	for k := range c.Applications {
 		switch c.Applications[k].ScanType {
 		case ScanTypeSandbox:
 			someSandbox = true
 		case ScanTypePolicy:
-			// totalPolicy++
 			somePolicy = true
 		case ScanTypePromote:
-			// totalPromoting++
 			somePromoting = true
+		}
+
+		if c.Applications[k].AutoPromote && c.Applications[k].ScanType == ScanTypeSandbox {
+			someAutoPromoting = true
 		}
 
 		if c.Applications[k].WaitForResult {
 			someWaiting = true
-			// totalWaiting++
 		}
 	}
 
@@ -62,15 +62,15 @@ func PrepareReportCard(c Config) reportcard.Model {
 		columnsOption = append(columnsOption, reportcard.Column{Name: columnPackage, Width: 7}, reportcard.Column{Name: columnUpload, Width: 6}, reportcard.Column{Name: columnCleanup, Width: 7})
 	}
 
-	if someWaiting {
+	if someWaiting || someAutoPromoting {
 		columnsOption = append(columnsOption, reportcard.Column{Name: columnResult, Width: 6})
 	}
 
-	if somePromoting {
+	if somePromoting || someAutoPromoting {
 		columnsOption = append(columnsOption, reportcard.Column{Name: columnPromote, Width: 7})
 	}
 
-	if somePolicy && someWaiting {
+	if (somePolicy && someWaiting) || someAutoPromoting {
 		columnsOption = append(columnsOption, reportcard.Column{Name: columnPolicy, Width: 8})
 	}
 
