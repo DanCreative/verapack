@@ -286,40 +286,39 @@ func packageAndUploadApplication_ui(options Options, appId int, reporter reporte
 				Output: `Veracode CLI v2.40.0 -- 8823f61
 	Please ensure your project builds successfully without any errors.
 
-	Packaging code for project verademo. Please wait; this may take a while...
-
-	Verifying source project language ...
-	Copying Java artifacts for MavenPackager project. Build failed, please run with --verbose flag for more details.
-	Packaging generic Javascript artifact for no-pm project.
-	Javascript project verademo packaged to: path\to\out\veracode-auto-pack-verademo-js-no-pm.zip
-	[GenericPackagerSQL] Packaging succeeded for the path path\to\temp-clone_448303049\verademo.
-	. Please check the verbose information for more details.ject path\to\temp-clone_448303049\verademo\app
-	This may result in reduced analysis scope, quality or performance.
-	Successfully created 2 artifact(s).
-	[INFO] SUMMARY - Javascript (GenericPackagerJS): "path\to\out\veracode-auto-pack-verademo-js-no-pm.zip"  (Size: 123.0KB, SHA2: 124d7a22689101b8327e9b73b96f83d12e36a4cba391i621a690878a871967ed)
-	[INFO] SUMMARY - SQL (GenericPackagerSQL): "path\to\out\veracode-auto-pack-verademo-sql.zip"  (Size: 12.6KB, SHA2: 8ab8eedd60fc0353152473e68bf190c8bc4d3444cd068dc95a06269fd4a79d72)
-	Total time taken to complete command: 46.724s`,
+Packaging code for project verademo. Please wait; this may take a while...
+Verifying source project language ...
+Copying Java artifacts for MavenPackager project. Build failed, please run with --verbose flag for more details.
+Packaging generic Javascript artifact for no-pm project.
+Javascript project verademo packaged to: path\to\out\veracode-auto-pack-verademo-js-no-pm.zip
+[GenericPackagerSQL] Packaging succeeded for the path path\to\temp-clone_448303049\verademo.
+. Please check the verbose information for more details.ject path\to\temp-clone_448303049\verademo\app
+This may result in reduced analysis scope, quality or performance.
+Successfully created 2 artifact(s).
+[INFO] SUMMARY - Javascript (GenericPackagerJS): "path\to\out\veracode-auto-pack-verademo-js-no-pm.zip"  (Size: 123.0KB, SHA2: 124d7a22689101b8327e9b73b96f83d12e36a4cba391i621a690878a871967ed)
+[INFO] SUMMARY - SQL (GenericPackagerSQL): "path\to\out\veracode-auto-pack-verademo-sql.zip"  (Size: 12.6KB, SHA2: 8ab8eedd60fc0353152473e68bf190c8bc4d3444cd068dc95a06269fd4a79d72)
+Total time taken to complete command: 46.724s`,
 			})
 		} else {
 			reporter.Send(reportcard.TaskResultMsg{
 				Status: reportcard.Success,
 				Index:  appId,
 				Output: `Veracode CLI v2.40.0 -- 8823f61
-	Please ensure your project builds successfully without any errors.
+Please ensure your project builds successfully without any errors.
 
-	Packaging code for project verademo. Please wait; this may take a while...
+Packaging code for project verademo. Please wait; this may take a while...
 
-	Verifying source project language ...
-	Copying Java artifacts for MavenPackager project. Build failed, please run with --verbose flag for more details.
-	Packaging generic Javascript artifact for no-pm project.
-	Javascript project verademo packaged to: path\to\out\veracode-auto-pack-verademo-js-no-pm.zip
-	[GenericPackagerSQL] Packaging succeeded for the path path\to\temp-clone_448303049\verademo.
-	. Please check the verbose information for more details.ject path\to\temp-clone_448303049\verademo\app
-	This may result in reduced analysis scope, quality or performance.
-	Successfully created 2 artifact(s).
-	[INFO] SUMMARY - Javascript (GenericPackagerJS): "path\to\out\veracode-auto-pack-verademo-js-no-pm.zip"  (Size: 123.0KB, SHA2: 124d7a22689101b8327e9c73b96f83d12e36a4cba391f621a690878a871967ed)
-	[INFO] SUMMARY - SQL (GenericPackagerSQL): "path\to\out\veracode-auto-pack-verademo-sql.zip"  (Size: 12.6KB, SHA2: 8ab8eedd60fc0353152473e68bf190a8ba4d3444cd068dc95a06269fd4b79d72)
-	Total time taken to complete command: 46.724s`,
+Verifying source project language ...
+Copying Java artifacts for MavenPackager project. Build failed, please run with --verbose flag for more details.
+Packaging generic Javascript artifact for no-pm project.
+Javascript project verademo packaged to: path\to\out\veracode-auto-pack-verademo-js-no-pm.zip
+[GenericPackagerSQL] Packaging succeeded for the path path\to\temp-clone_448303049\verademo.
+. Please check the verbose information for more details.ject path\to\temp-clone_448303049\verademo\app
+This may result in reduced analysis scope, quality or performance.
+Successfully created 2 artifact(s).
+[INFO] SUMMARY - Javascript (GenericPackagerJS): "path\to\out\veracode-auto-pack-verademo-js-no-pm.zip"  (Size: 123.0KB, SHA2: 124d7a22689101b8327e9c73b96f83d12e36a4cba391f621a690878a871967ed)
+[INFO] SUMMARY - SQL (GenericPackagerSQL): "path\to\out\veracode-auto-pack-verademo-sql.zip"  (Size: 12.6KB, SHA2: 8ab8eedd60fc0353152473e68bf190a8ba4d3444cd068dc95a06269fd4b79d72)
+Total time taken to complete command: 46.724s`,
 			})
 		}
 	}
@@ -335,37 +334,37 @@ func packageAndUploadApplication_ui(options Options, appId int, reporter reporte
 			Index:   appId,
 			IsFatal: true,
 			Output: `[2025.06.01 19:12:26.380] Transaction ID: [123-123-123-124]
-	[2025.06.01 19:12:28.940]
-	[2025.06.01 19:12:28.940] Application profile "Verademo" (appid=0) was located.
-	[2025.06.01 19:12:28.940]
-	[2025.06.01 19:12:28.940] Creating a new analysis with name "25.0.0".
-	[2025.06.01 19:12:29.707]
-	[2025.06.01 19:12:29.707] * Action "UploadAndScan" returned the following message:
-	[2025.06.01 19:12:29.707] * The version 25.0.0 already exists
-	[2025.06.01 19:12:29.707]
-	[2025.06.01 19:12:31.055] Scan status is Results Ready
-	[2025.06.01 19:12:31.057]
-	[2025.06.01 19:12:31.057] * A scan has failed to complete successfully. Delete the failed scan from the Veracode Platform and try again.`,
+[2025.06.01 19:12:28.940]
+[2025.06.01 19:12:28.940] Application profile "Verademo" (appid=0) was located.
+[2025.06.01 19:12:28.940]
+[2025.06.01 19:12:28.940] Creating a new analysis with name "25.0.0".
+[2025.06.01 19:12:29.707]
+[2025.06.01 19:12:29.707] * Action "UploadAndScan" returned the following message:
+[2025.06.01 19:12:29.707] * The version 25.0.0 already exists
+[2025.06.01 19:12:29.707]
+[2025.06.01 19:12:31.055] Scan status is Results Ready
+[2025.06.01 19:12:31.057]
+[2025.06.01 19:12:31.057] * A scan has failed to complete successfully. Delete the failed scan from the Veracode Platform and try again.`,
 		})
 	} else {
 		reporter.Send(reportcard.TaskResultMsg{
 			Status: reportcard.Success,
 			Index:  appId,
 			Output: `[2025.06.01 19:10:36.383] Transaction ID: [123-123-123-123]
-	[2025.06.01 19:10:39.543]
-	[2025.06.01 19:10:39.543] Application profile "Verademo" (appid=0) was located.
-	[2025.06.01 19:10:39.544]
-	[2025.06.01 19:10:39.544] Creating a new analysis with name "25.0.0".
-	[2025.06.01 19:10:41.788]
-	[2025.06.01 19:10:41.788] The analysis id of the new analysis is "0".
-	[2025.06.01 19:10:41.789]
-	[2025.06.01 19:10:41.789] Uploading: path\to\out\veracode-auto-pack-verademo-js-no-pm.zip
-	[2025.06.01 19:10:43.311]
-	[2025.06.01 19:10:43.311] Starting pre-scan verification for application "Verademo" analysis "25.0.0".
-	[2025.06.01 19:10:44.948]
-	[2025.06.01 19:10:44.948] Scan polling interval is set to the default of 120 seconds.
-	[2025.06.01 19:10:44.949]
-	[2025.06.01 19:10:44.949] Application "Verademo" analysis "25.0.0" will be automatically submitted for scanning if the pre-scan verification is successful.`,
+[2025.06.01 19:10:39.543]
+[2025.06.01 19:10:39.543] Application profile "Verademo" (appid=0) was located.
+[2025.06.01 19:10:39.544]
+[2025.06.01 19:10:39.544] Creating a new analysis with name "25.0.0".
+[2025.06.01 19:10:41.788]
+[2025.06.01 19:10:41.788] The analysis id of the new analysis is "0".
+[2025.06.01 19:10:41.789]
+[2025.06.01 19:10:41.789] Uploading: path\to\out\veracode-auto-pack-verademo-js-no-pm.zip
+[2025.06.01 19:10:43.311]
+[2025.06.01 19:10:43.311] Starting pre-scan verification for application "Verademo" analysis "25.0.0".
+[2025.06.01 19:10:44.948]
+[2025.06.01 19:10:44.948] Scan polling interval is set to the default of 120 seconds.
+[2025.06.01 19:10:44.949]
+[2025.06.01 19:10:44.949] Application "Verademo" analysis "25.0.0" will be automatically submitted for scanning if the pre-scan verification is successful.`,
 		})
 	}
 

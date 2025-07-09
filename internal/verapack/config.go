@@ -156,7 +156,7 @@ func SetDefaults(configBytes []byte) (Config, error) {
 }
 
 func setPostMergeDefaults(options *Options) {
-	if options.WaitForResult {
+	if options.WaitForResult || options.AutoPromote {
 		if options.ScanTimeout <= 0 {
 			options.ScanTimeout = 120
 		}
