@@ -43,24 +43,29 @@ func packageAndUploadApplication(uploaderPath string, options Options, appId int
 			return err
 		}
 
-		cloneOut, err := CloneRepository(options, filepath.Join(packageOutputBaseDirectory, "source"), nil)
-		if err != nil {
-			reporter.Send(reportcard.TaskResultMsg{
-				Status:  reportcard.Failure,
-				Output:  cloneOut,
-				Index:   appId,
-				IsFatal: true,
-			})
-			cleanupTask(options, packageOutputBaseDirectory, appId, reporter)
-			return err
-		}
+		var cloneOut string
 
-		// The source code retrieved from the git shallow clone will be used as the input
-		// for the packaging.
-		// Regardless of whether the original source was repo or dir, the packager is told
-		// to use dir.
-		options.PackageSource = filepath.Join(packageOutputBaseDirectory, "source")
-		options.Type = Directory
+		if options.Type == Repo || options.Branch != "" {
+			// Perform a shallow clone of a git repository.
+			// If the git repo is remote, this will always run.
+			// If the git repo is local, it will only be run if [Options].Branch is set.
+			cloneOut, err = CloneRepository(options, filepath.Join(packageOutputBaseDirectory, "source"), nil)
+			if err != nil {
+				reporter.Send(reportcard.TaskResultMsg{
+					Status:  reportcard.Failure,
+					Output:  cloneOut,
+					Index:   appId,
+					IsFatal: true,
+				})
+				cleanupTask(options, packageOutputBaseDirectory, appId, reporter)
+				return err
+			}
+
+			// Regardless of whether the original source was repo or dir, the packager is told
+			// to use dir.
+			options.PackageSource = filepath.Join(packageOutputBaseDirectory, "source")
+			options.Type = Directory
+		}
 
 		artefactPaths, out, err := PackageApplication(options, filepath.Join(packageOutputBaseDirectory, "out"), nil)
 
