@@ -3,6 +3,7 @@ package verapack
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"io"
 	"os/exec"
 	"strconv"
@@ -49,6 +50,8 @@ func uploadOptionsToArgs(options Options) []string {
 }
 
 func UploadAndScanApplication(options Options, writer io.Writer) (string, error) {
+	fmt.Fprintf(writer, "BEGIN (%s)\n", columnUpload)
+
 	path, err := exec.LookPath("java")
 	if err != nil {
 		return err.Error(), err
@@ -69,6 +72,8 @@ func UploadAndScanApplication(options Options, writer io.Writer) (string, error)
 
 	sanitizer := runeutil.NewSanitizer()
 	out := string(sanitizer.Sanitize([]rune(outBuffer.String())))
+
+	fmt.Fprintf(writer, "END (%s)\n", columnUpload)
 
 	if err != nil {
 		return err.Error() + "\n" + out, errScanningErr
