@@ -159,7 +159,7 @@ func getArtefactPath(dirPath string) ([]string, error) {
 // NOTE: baseDir is the temp dir + app folder
 // Creates the path and returns said path
 func createAppPackagingOutputDir(appName string) (string, error) {
-	path := filepath.Join(os.TempDir(), "verapack", appName, strconv.FormatInt(time.Now().Unix(), 10))
+	path := filepath.Join(os.TempDir(), "verapack", "workdir", appName, strconv.FormatInt(time.Now().Unix(), 10))
 	err := os.MkdirAll(path, 0600)
 	return path, err
 }
