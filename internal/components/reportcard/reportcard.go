@@ -17,6 +17,7 @@ type TaskStatus int
 
 const (
 	Success TaskStatus = iota
+	Warning
 	InProgress
 	Failure
 	Skip
@@ -349,6 +350,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.rows[msg.Index].Tasks[m.activeTasks[msg.Index]].customSuccessStatus = msg.CustomSuccessStatus
 
 			switch msg.Status {
+			case Warning:
+				m.rows[msg.Index].Tasks[m.activeTasks[msg.Index]].Status = Warning
+				m.handleRemainingTasks(msg.Index, m.activeTasks[msg.Index], false)
+
 			case Success:
 				m.rows[msg.Index].Tasks[m.activeTasks[msg.Index]].Status = Success
 				m.handleRemainingTasks(msg.Index, m.activeTasks[msg.Index], false)
@@ -494,7 +499,7 @@ func (m *Model) handleRemainingTasks(i int, taskIndex int, isFatal bool) {
 		case Failure:
 			m.failureCount++
 			m.inProgressCount--
-		case Success:
+		case Success, Warning:
 			if m.rows[i].FinalStatus != Failure {
 				// Some tasks can run after a previous task fails fatally.
 				// This makes sure that the final result for the row is shown
@@ -641,6 +646,15 @@ func (m Model) renderTaskColumn(status TaskStatus, style lipgloss.Style, index, 
 	var r, renderedCell string
 
 	switch status {
+	case Warning:
+		renderedCell = style.Render("⚠")
+
+		// shows the user which task output they are looking at.
+		if selectedItem, row, col := m.selector.GetSelected(); m.showOutput && selectedItem != nil && row == index && col == taskIndex {
+			return m.styles.Cell.Inherit(m.styles.Selected).Render(renderedCell)
+		}
+
+		return m.styles.Cell.Foreground(lipgloss.Color("#FFA500")).Render(renderedCell)
 	case Success:
 		renderedCell = style.Render("✓")
 

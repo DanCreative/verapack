@@ -99,9 +99,16 @@ func packageAndUploadApplication(uploaderPath string, options Options, appId int
 			cleanupTask(options, packageOutputBaseDirectory, appId, reporter, logWriter)
 			return err
 		}
+		var packageStatus reportcard.TaskStatus
+
+		if logWriter.ContainsWarning() {
+			packageStatus = reportcard.Warning
+		} else {
+			packageStatus = reportcard.Success
+		}
 
 		reporter.Send(reportcard.TaskResultMsg{
-			Status: reportcard.Success,
+			Status: packageStatus,
 			Index:  appId,
 			Output: out,
 		})
