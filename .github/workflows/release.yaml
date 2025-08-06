@@ -53,7 +53,7 @@ jobs:
 
     # Documentation: https://github.com/softprops/action-gh-release
     - name: Release
-      uses: softprops/action-gh-release@v2.2.2
+      uses: softprops/action-gh-release@v2.3.2
       with:
         generate_release_notes: true
         fail_on_unmatched_files: true
