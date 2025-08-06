@@ -11,9 +11,10 @@ import (
 
 // lineCounterWriter is a wrapper for an io.Writer, that counts the number of new line tokens that are being written.
 type lineCounterWriter struct {
-	writer    io.Writer
-	startLine int
-	endLine   int
+	writer          io.Writer
+	startLine       int
+	endLine         int
+	containsWarning bool
 }
 
 func (c *lineCounterWriter) Write(p []byte) (n int, err error) {
@@ -21,11 +22,23 @@ func (c *lineCounterWriter) Write(p []byte) (n int, err error) {
 		c.endLine += i
 	}
 
+	if bytes.Contains(p, []byte("WARN")) {
+		c.containsWarning = true
+	}
+
+	if bytes.Contains(p, []byte("WARNING")) {
+		c.containsWarning = true
+	}
+
 	return c.writer.Write(p)
 }
 
 func (c *lineCounterWriter) GetEndLine() int {
 	return c.endLine
+}
+
+func (c *lineCounterWriter) ContainsWarning() bool {
+	return c.containsWarning
 }
 
 func newLineCounterWriter(startLine int, writer io.Writer) *lineCounterWriter {

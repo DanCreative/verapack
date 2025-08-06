@@ -17,6 +17,7 @@ type TaskStatus int
 
 const (
 	Success TaskStatus = iota
+	Warning
 	InProgress
 	Failure
 	Skip
@@ -104,7 +105,7 @@ type Model struct {
 	prefixColumns   []Column // prefixColumns contains non-task columns that should be rendered to the left of the taskColumns.
 	nameColumnWidth int      // nameColumnWidth contains the width of the name column. The name column is treated specially.
 	rows            []Row
-	output          output
+	// output          output
 	// activeTasks is a map[int]int where the key is an index for Model.rows and the value is the index for Model.rows[n].Tasks[].
 	// activeTasks stores which tasks are currently in progress for all of the items. Entries are deleted once their tasks are finished.
 	activeTasks           map[int]int
@@ -113,6 +114,7 @@ type Model struct {
 	showOutput            bool // showOutput indicates whether the output should be shown.
 	selector              selector[TaskResultMsg]
 	termWidth             int // termWidth contains the width of the terminal. This is used to dynamically size the output window.
+	termHeight            int // termHeight contains the height of the terminal. This is used to dynamically size the output window.
 	notFirstCompletedTask bool
 
 	pageSize         int // total rows per page
@@ -122,151 +124,8 @@ type Model struct {
 	failureCount    int
 	successCount    int
 	inProgressCount int
-}
 
-type direction int
-
-const (
-	up direction = iota
-	right
-	down
-	left
-)
-
-// selector stores all of the results and handles logic for moving between selected results.
-type selector[T any] struct {
-	notFirst           bool
-	selectedItemRow    int
-	selectedItemColumn int
-	selectableItems    [][]*T // using pointer to easily check if selected
-}
-
-// MoveCursor moves the selector cursor in the direction provided for step int provided.
-//
-// It returns the currently selected item if it did not move and the new item if it did.
-// It also returns the row and column index, and a bool indicating whether it moved or not.
-func (s *selector[T]) MoveCursor(direction direction, step int) (T, int, int, bool) {
-	var didMove bool
-
-	switch direction {
-	case up:
-	upOuter:
-		for i := s.selectedItemRow - step; i >= 0; i-- {
-			if s.selectableItems[i][s.selectedItemColumn] != nil {
-				s.selectedItemRow = i
-				didMove = true
-				break upOuter
-			} else {
-				for j := range len(s.selectableItems[i]) {
-					if s.selectableItems[i][j] != nil {
-						s.selectedItemColumn = j
-						s.selectedItemRow = i
-						didMove = true
-						break upOuter
-					}
-				}
-			}
-		}
-	case down:
-	downOuter:
-		for i := s.selectedItemRow + step; i < len(s.selectableItems); i++ {
-			if s.selectableItems[i][s.selectedItemColumn] != nil {
-				s.selectedItemRow = i
-				didMove = true
-				break downOuter
-
-			} else {
-				for j := range len(s.selectableItems[i]) {
-					if s.selectableItems[i][j] != nil {
-						s.selectedItemColumn = j
-						s.selectedItemRow = i
-						didMove = true
-						break downOuter
-					}
-				}
-			}
-		}
-	case right:
-		for i := s.selectedItemColumn + step; i < len(s.selectableItems[s.selectedItemRow]); i++ {
-			if s.selectableItems[s.selectedItemRow][i] != nil {
-				s.selectedItemColumn = i
-				didMove = true
-				break
-			}
-		}
-	case left:
-		for i := s.selectedItemColumn - step; i >= 0; i-- {
-			if s.selectableItems[s.selectedItemRow][i] != nil {
-				s.selectedItemColumn = i
-				didMove = true
-				break
-			}
-		}
-	}
-
-	return *s.selectableItems[s.selectedItemRow][s.selectedItemColumn], s.selectedItemRow, s.selectedItemColumn, didMove
-}
-
-func (s *selector[T]) AddSelectable(item T, row, col int) {
-	s.selectableItems[row][col] = &item
-
-	if !s.notFirst {
-		s.selectedItemRow, s.selectedItemColumn = row, col
-		s.notFirst = true
-	}
-}
-
-func (s *selector[T]) GetSelected() (item *T, row, col int) {
-	item, row, col = s.selectableItems[s.selectedItemRow][s.selectedItemColumn], s.selectedItemRow, s.selectedItemColumn
-	return
-}
-
-func (s *selector[T]) SetSelected(row, col int) *T {
-	s.selectedItemRow = row
-	s.selectedItemColumn = col
-
-	return s.selectableItems[s.selectedItemRow][s.selectedItemColumn]
-}
-
-// SetSelectedInRange finds and sets the first selectable item within the range.
-//
-// startIndex is inclusive and endIndex is exclusive.
-func (s *selector[T]) SetSelectedInRange(startIndex, endIndex int) (item *T, row, col int, found bool) {
-	r, c, found := s.GetSelectedInRange(startIndex, endIndex)
-
-	if found {
-		s.selectedItemColumn = c
-		s.selectedItemRow = r
-	}
-
-	item, row, col = s.selectableItems[s.selectedItemRow][s.selectedItemColumn], s.selectedItemRow, s.selectedItemColumn
-	return
-}
-
-func (s *selector[T]) GetSelectedInRange(startIndex, endIndex int) (row, col int, found bool) {
-	for i := startIndex; i < endIndex; i++ {
-		for j := 0; j < len(s.selectableItems[i]); j++ {
-			if s.selectableItems[i][j] != nil {
-				col = j
-				row = i
-				found = true
-				return
-			}
-		}
-	}
-	return
-}
-
-func newSelector[T any](numColumns, numRows int) selector[T] {
-	s := make([][]*T, numRows)
-
-	for i := range s {
-		s[i] = make([]*T, numColumns)
-	}
-
-	return selector[T]{
-		selectableItems: s,
-	}
+	defaultViewport Viewport
 }
 
 // Option is used to set options in New. For example:
@@ -354,6 +213,7 @@ func NewModel(options ...Option) Model {
 		KeyMap:          DefaultKeyMap(),
 		Help:            help.New(),
 		pageSize:        defaultPageSize,
+		defaultViewport: &DefaultViewport{},
 	}
 
 	for _, opt := range options {
@@ -402,8 +262,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
-		// get the width of the terminal
+		// get the width and height of the terminal
 		m.termWidth = msg.Width
+		m.termHeight = msg.Height
+
+		m.defaultViewport.SetDimensions(int(float64(m.termWidth)*0.6), int(float64(m.termHeight)*0.3))
 
 	case tea.KeyMsg:
 		switch {
@@ -442,44 +305,34 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					item, _, _, _ = m.selector.SetSelectedInRange(m.pageCurrentStart, m.pageCurrentEnd+1)
 				}
 
-				m.output.SetContent(item.Output, int(float64(m.termWidth)*0.6))
+				if !m.defaultViewport.HasBeenInitialized() {
+					// Initialize the viewport for the first time.
+					cmds = append(cmds, m.defaultViewport.Init(int(float64(m.termWidth)*0.6), int(float64(m.termHeight)*0.3), item.Output))
+				} else if m.selector.HasChanged() {
+					// Update the content if the viewport has already been initialized and if the selector has moved.
+					// i.e. don't reload the viewport if nothing has changed.
+					m.defaultViewport.SetContent(item.Output)
+				}
 			}
 
 		case key.Matches(msg, m.KeyMap.PageDown):
-			lines := m.output.viewport.ViewDown()
-			if m.output.viewport.HighPerformanceRendering {
-				cmds = append(cmds, ViewDown(m.output.viewport, lines))
-			}
+			cmds = append(cmds, m.defaultViewport.ViewDown())
 
 		case key.Matches(msg, m.KeyMap.PageUp):
-			lines := m.output.viewport.ViewUp()
-			if m.output.viewport.HighPerformanceRendering {
-				cmds = append(cmds, ViewUp(m.output.viewport, lines))
-			}
+			cmds = append(cmds, m.defaultViewport.ViewUp())
 
 		case key.Matches(msg, m.KeyMap.HalfPageDown):
-			lines := m.output.viewport.HalfViewDown()
-			if m.output.viewport.HighPerformanceRendering {
-				cmds = append(cmds, ViewDown(m.output.viewport, lines))
-			}
+			cmds = append(cmds, m.defaultViewport.HalfViewDown())
 
 		case key.Matches(msg, m.KeyMap.HalfPageUp):
-			lines := m.output.viewport.HalfViewUp()
-			if m.output.viewport.HighPerformanceRendering {
-				cmds = append(cmds, ViewUp(m.output.viewport, lines))
-			}
+			cmds = append(cmds, m.defaultViewport.HalfViewUp())
 
 		case key.Matches(msg, m.KeyMap.Down):
-			lines := m.output.viewport.LineDown(1)
-			if m.output.viewport.HighPerformanceRendering {
-				cmds = append(cmds, ViewDown(m.output.viewport, lines))
-			}
+			cmds = append(cmds, m.defaultViewport.LineDown(1))
 
 		case key.Matches(msg, m.KeyMap.Up):
-			lines := m.output.viewport.LineUp(1)
-			if m.output.viewport.HighPerformanceRendering {
-				cmds = append(cmds, ViewUp(m.output.viewport, lines))
-			}
+			cmds = append(cmds, m.defaultViewport.LineUp(1))
+
 		}
 	case TaskResultMsg:
 		// if the incoming msg is for a task that is still active, handle it, otherwise
@@ -497,6 +350,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.rows[msg.Index].Tasks[m.activeTasks[msg.Index]].customSuccessStatus = msg.CustomSuccessStatus
 
 			switch msg.Status {
+			case Warning:
+				m.rows[msg.Index].Tasks[m.activeTasks[msg.Index]].Status = Warning
+				m.handleRemainingTasks(msg.Index, m.activeTasks[msg.Index], false)
+
 			case Success:
 				m.rows[msg.Index].Tasks[m.activeTasks[msg.Index]].Status = Success
 				m.handleRemainingTasks(msg.Index, m.activeTasks[msg.Index], false)
@@ -512,7 +369,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	m.spinner, cmd = m.spinner.Update(msg)
 	cmds = append(cmds, cmd)
-	m.output, cmd = m.output.Update(msg)
+	m.defaultViewport, cmd = m.defaultViewport.Update(msg)
 	cmds = append(cmds, cmd)
 	return m, tea.Batch(cmds...)
 }
@@ -522,7 +379,8 @@ func (m *Model) MoveOne(direction direction) {
 	item, row, _, didMove := m.selector.MoveCursor(direction, 1)
 	if didMove {
 		// Only update the content if the cursor actually moved.
-		m.output.SetContent(item.Output, int(float64(m.termWidth)*0.6))
+		// m.output.SetContent(item.Output, int(float64(m.termWidth)*0.6))
+		m.defaultViewport.SetContent(item.Output)
 
 		_, _, pageStart, pageEnd := GetPaginationDetails(len(m.rows), m.pageSize, row)
 		m.pageCurrentStart = pageStart
@@ -542,7 +400,7 @@ func (m *Model) PageDown() {
 
 	if m.showOutput {
 		item := m.selector.SetSelected(m.pageCurrentStart, m.selector.selectedItemColumn)
-		m.output.SetContent(item.Output, int(float64(m.termWidth)*0.6))
+		m.defaultViewport.SetContent(item.Output)
 	}
 }
 
@@ -558,7 +416,7 @@ func (m *Model) PageUp() {
 
 	if m.showOutput {
 		item := m.selector.SetSelected(m.pageCurrentStart, m.selector.selectedItemColumn)
-		m.output.SetContent(item.Output, int(float64(m.termWidth)*0.6))
+		m.defaultViewport.SetContent(item.Output)
 	}
 }
 
@@ -641,7 +499,7 @@ func (m *Model) handleRemainingTasks(i int, taskIndex int, isFatal bool) {
 		case Failure:
 			m.failureCount++
 			m.inProgressCount--
-		case Success:
+		case Success, Warning:
 			if m.rows[i].FinalStatus != Failure {
 				// Some tasks can run after a previous task fails fatally.
 				// This makes sure that the final result for the row is shown
@@ -695,18 +553,8 @@ func (m Model) View() string {
 		)
 	}
 
-	var output string
-	if m.showOutput {
-		output = m.styles.Border.Render(fmt.Sprintf("%s\n\n", lipgloss.NewStyle().Bold(true).Render("Output")) + m.output.View())
+	output := m.renderOutput()
 
-		if m.output.viewport.VisibleLineCount() < m.output.viewport.TotalLineCount() {
-			output = lipgloss.JoinHorizontal(
-				lipgloss.Center,
-				output,
-				m.renderOutputScrollBar(m.Help.Styles.FullDesc, m.Help.Styles.FullKey),
-			)
-		}
-	}
 	return lipgloss.JoinVertical(lipgloss.Left, summary, output) + "\n" + m.Help.View(m.KeyMap)
 }
 
@@ -798,6 +646,15 @@ func (m Model) renderTaskColumn(status TaskStatus, style lipgloss.Style, index, 
 	var r, renderedCell string
 
 	switch status {
+	case Warning:
+		renderedCell = style.Render("⚠")
+
+		// shows the user which task output they are looking at.
+		if selectedItem, row, col := m.selector.GetSelected(); m.showOutput && selectedItem != nil && row == index && col == taskIndex {
+			return m.styles.Cell.Inherit(m.styles.Selected).Render(renderedCell)
+		}
+
+		return m.styles.Cell.Foreground(lipgloss.Color("#FFA500")).Render(renderedCell)
 	case Success:
 		renderedCell = style.Render("✓")
 
@@ -868,6 +725,60 @@ func (m Model) renderPageCounts() string {
 	}).PaddingLeft(m.styles.NameHeader.GetPaddingLeft()).Render(fmt.Sprintf("page: %d of %d", currPage+1, numPages))
 }
 
+func (m Model) renderOutputScrollBar(arrowStyle, keyStyle lipgloss.Style) string {
+	var s string
+	if m.defaultViewport.AtTop() {
+		s += arrowStyle.Render("┬")
+	} else {
+		s += arrowStyle.Render("↟") + " " + keyStyle.Render(strings.Join(m.KeyMap.PageUp.Keys(), ",")) + "\n"
+		s += arrowStyle.Render("↑") + " " + keyStyle.Render(strings.Join(m.KeyMap.Up.Keys(), ","))
+	}
+
+	s += "\n"
+
+	if m.defaultViewport.AtBottom() {
+		s += arrowStyle.Render("┴")
+	} else {
+		s += arrowStyle.Render("↓") + " " + keyStyle.Render(strings.Join(m.KeyMap.Down.Keys(), ",")) + "\n"
+		s += arrowStyle.Render("↡") + " " + keyStyle.Render(strings.Join(m.KeyMap.PageDown.Keys(), ","))
+	}
+
+	return s
+}
+
+func (m Model) renderOutput() string {
+	var output string
+
+	if m.showOutput {
+		// output = m.styles.Border.Render(fmt.Sprintf("%s\n%s\n", lipgloss.NewStyle().Bold(true).Render("Output"), lipgloss.NewStyle().Foreground(m.styles.Border.GetBorderBottomForeground()).Render(strings.Repeat("─", m.output.viewport.Width*3))) + m.output.View())
+		output = m.styles.Border.Render(fmt.Sprintf("%s\n\n", lipgloss.NewStyle().Bold(true).Render("Output")) + m.defaultViewport.View())
+
+		if m.defaultViewport.ShouldShowScrollBar() {
+			output = lipgloss.JoinHorizontal(
+				lipgloss.Center,
+				output,
+				m.renderOutputScrollBar(m.Help.Styles.FullDesc, m.Help.Styles.FullKey),
+			)
+		}
+	}
+
+	return output
+}
+
+// ShortHelp implements the KeyMap interface.
+func (km KeyMap) ShortHelp() []key.Binding {
+	return []key.Binding{km.Quit, km.Help, km.ShowOutput, km.LineUp, km.LineDown, km.ColLeft, km.ColRight}
+}
+
+// FullHelp implements the KeyMap interface.
+func (km KeyMap) FullHelp() [][]key.Binding {
+	return [][]key.Binding{
+		{km.Quit, km.Help, km.ShowOutput, km.LineUp, km.LineDown},
+		{km.Down, km.Up, km.HalfPageDown, km.HalfPageUp, km.PageDownSummary},
+		{km.PageUpSummary, km.ColLeft, km.ColRight, km.PageUp, km.PageDown},
+	}
+}
+
 func renderPageScrollBar(pageStart, pageEnd, totalElements int, arrowStyle, keyStyle lipgloss.Style, pageUpKey, pageDownKey string) string {
 	var s string
 
@@ -887,41 +798,6 @@ func renderPageScrollBar(pageStart, pageEnd, totalElements int, arrowStyle, keyS
 	}
 
 	return s
-}
-
-func (m Model) renderOutputScrollBar(arrowStyle, keyStyle lipgloss.Style) string {
-	var s string
-	if m.output.viewport.YOffset == 0 {
-		s += arrowStyle.Render("┬")
-	} else {
-		s += arrowStyle.Render("↟") + " " + keyStyle.Render(strings.Join(m.KeyMap.PageUp.Keys(), ",")) + "\n"
-		s += arrowStyle.Render("↑") + " " + keyStyle.Render(strings.Join(m.KeyMap.Up.Keys(), ","))
-	}
-
-	s += "\n"
-
-	if m.output.viewport.YOffset+1 > m.output.viewport.TotalLineCount()-m.output.viewport.VisibleLineCount() {
-		s += arrowStyle.Render("┴")
-	} else {
-		s += arrowStyle.Render("↓") + " " + keyStyle.Render(strings.Join(m.KeyMap.Down.Keys(), ",")) + "\n"
-		s += arrowStyle.Render("↡") + " " + keyStyle.Render(strings.Join(m.KeyMap.PageDown.Keys(), ","))
-	}
-
-	return s
-}
-
-// ShortHelp implements the KeyMap interface.
-func (km KeyMap) ShortHelp() []key.Binding {
-	return []key.Binding{km.Quit, km.Help, km.ShowOutput, km.LineUp, km.LineDown, km.ColLeft, km.ColRight}
-}
-
-// FullHelp implements the KeyMap interface.
-func (km KeyMap) FullHelp() [][]key.Binding {
-	return [][]key.Binding{
-		{km.Quit, km.Help, km.ShowOutput, km.LineUp, km.LineDown},
-		{km.Down, km.Up, km.HalfPageDown, km.HalfPageUp, km.PageDownSummary},
-		{km.PageUpSummary, km.ColLeft, km.ColRight, km.PageUp, km.PageDown},
-	}
 }
 
 // DefaultKeyMap returns a default set of keybindings.
