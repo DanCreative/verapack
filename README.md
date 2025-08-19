@@ -29,7 +29,22 @@ The scope of this tool is not to replace automated security testing. This tool i
 
 ## 📥 Installation
 
-To install Verapack, you can download the latest build from the [releases](https://github.com/DanCreative/verapack/releases) tab. Then once the archive has been downloaded and extracted, you can move the binary inside to a directory that makes sense to you and add said directory path to your user account `PATH` environment variable. E.g. `%Appdata%\verapack`
+### Windows
+
+#### Option 1: Automatic
+
+> [!NOTE]  
+> If you run the script from an elevated terminal, it will install verapack for all users. Otherwise it will just install it for the current user.
+
+Open a PowerShell terminal and run below:
+
+```PowerShell
+
+```
+
+#### Option 2: Manual
+
+To install Verapack manually, you can download the latest build from the [releases](https://github.com/DanCreative/verapack/releases) tab. Then once the archive has been downloaded and extracted, you can move the binary inside to a directory that makes sense to you and add said directory path to your user account `PATH` environment variable. E.g. `%Appdata%\verapack`
 
 ## 📖 Basic User Guide
 
