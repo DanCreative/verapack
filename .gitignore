@@ -24,5 +24,29 @@ go.work.sum
 # env file
 .env
 
+# Local files
 local/
+
+# Output files
+out/
+
+# Visual Studio Code
 .vscode/
+
+# Visual Studio
+.vs/
+
+# .NET Core build folders / build results
+[Dd]ebug/
+[Dd]ebugPublic/
+[Rr]elease/
+[Rr]eleases/
+x64/
+x86/
+build/
+bld/
+[Bb]in/
+[Oo]bj/
+msbuild.log
+msbuild.err
+msbuild.wrn
