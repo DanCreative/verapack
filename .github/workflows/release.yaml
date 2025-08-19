@@ -1,12 +1,15 @@
-name: release-bundled-application
+name: release
 
 on:
   push:
     tags:
       - "v*.*.*"
 
+permissions:
+  contents: write
+
 jobs:
-  release:
+  build-app:
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -18,6 +21,7 @@ jobs:
     - uses: actions/checkout@v4
 
     - name: Set up Go
+      id: go
       uses: actions/setup-go@v4
       with:
         go-version-file: go.mod
@@ -30,31 +34,83 @@ jobs:
 
     - name: Go Mod Verify
       run: go mod verify
-
-    # - name: Set up JDK 17 for x64
-    #   uses: actions/setup-java@v4
-    #   with:
-    #     java-version: '17'
-    #     distribution: 'temurin'
-
-    # - name: Remove default API wrapper jar
-    #   run: rm internal/verapack/vosp-api-wrappers-java-*.*.*.*.jar
-
-    # - name: Download latest API wrapper jar
-    #   run: mvn dependency:copy -Dartifact="com.veracode.vosp.api.wrappers:vosp-api-wrappers-java:LATEST" -DoutputDirectory="internal/verapack/"
     
     - name: Build
-      run: GOOS=${{ matrix.os }} GOARCH=${{ matrix.arch }} go build -o out/verapack-${{ matrix.os }}-${{ matrix.arch }}-${{ github.ref_name }}/ -ldflags='-s -w -X "main.Version='${{ github.ref_name }}'"' ./cmd/verapack/
+      run: GOOS=${{ matrix.os }} GOARCH=${{ matrix.arch }} go build -o . -ldflags='-s -w -X "main.Version='${{ github.ref_name }}'"' ./cmd/verapack/
 
-    - name: Zip build for release
+    - name: Create Archive
       run: |
         sudo apt-get install zip gzip tar
-        (cd out && zip -r ../verapack-${{ matrix.os }}-${{ matrix.arch }}-${{ github.ref_name }}.zip .)
+        mkdir out
+        zip -j out/verapack-${{ matrix.os }}-${{ matrix.arch }}-${{ github.ref_name }}.zip verapack.*
+
+    - name: Upload Artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: artefact-${{ matrix.os }}-${{ matrix.arch }}
+        path: out/*.zip
+        if-no-files-found: error
+        overwrite: true       
+    
+  update-docs:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v5
+
+    - name: Set version in Powershell install script
+      run: |
+        mkdir out
+        sed 's/${version}/${{ github.ref_name }}/' install/Install.ps1 > Install.ps1
+
+    - name: Minify PowerShell install script
+      uses: StartAutomating/PSMinifier@v1.1.3
+      with:
+        Include: "Install.ps1"
+    
+    - name: Update README
+      run: |
+        value=$(cat Install.min.ps1)
+        echo $value
+        sed -i "42i $value" README.md
+
+    - name: Commit changes
+      run: |
+        git config user.name "github-actions[bot]"
+        git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+        git switch -c auto-update-ps-readme
+        git add README.md
+        git commit -m "Updated README for tag: '${{ github.ref_name }}'"
+        git push --set-upstream origin auto-update-ps-readme
+
+        gh pr create --fill -a @DanCreative
+      
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  release:
+    runs-on: ubuntu-latest
+    needs: build-app
+    steps:
+    - name: Download built artifacts
+      uses: actions/download-artifact@v5
+      with:
+        merge-multiple: true
+        path: out
+
+    - name: List files
+      id: file-list
+      run: |
+        {
+          echo 'MULTILINE_FILE_LIST<<EOF'
+          find out -type f
+          echo EOF
+        } >> "$GITHUB_OUTPUT"
+        
 
     # Documentation: https://github.com/softprops/action-gh-release
-    - name: Release
-      uses: softprops/action-gh-release@v2.2.2
+    - name: Create Github Release
+      uses: softprops/action-gh-release@v2.3.2
       with:
         generate_release_notes: true
         fail_on_unmatched_files: true
-        files: verapack-${{ matrix.os }}-${{ matrix.arch }}-${{ github.ref_name }}.zip
+        files: ${{ steps.file-list.outputs.MULTILINE_FILE_LIST }}
