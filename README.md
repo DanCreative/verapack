@@ -31,7 +31,56 @@ The scope of this tool is not to replace automated security testing. This tool i
 
 ### Windows
 
-To install Verapack, you can download the latest build from the [releases](https://github.com/DanCreative/verapack/releases) tab. Then once the archive has been downloaded and extracted, you can move the binary inside to a directory that makes sense to you and add said directory path to your user account's `PATH` environment variable. E.g. `%Appdata%\verapack`
+<details open>
+<summary><strong>Option 1: Chocolatey</strong></summary>
+
+<br/>
+
+To install the latest version of verapack on **Windows** using **Chocolatey**, run below command in an elevated terminal:
+
+```powershell
+choco install verapack -y
+```
+
+</details>
+
+<details>
+<summary><strong>Option 2: Powershell</strong></summary>
+
+<br/>
+
+Please note:
+
+- The script is not digitally signed. You might not be able to install this way, depending on how strict your environment is.
+- If you run the script from an elevated terminal, it will install verapack for all users. Otherwise, it will just install it for the current user.
+
+<!-- > [!WARNING]  
+> The script is not digitally signed.
+>
+> You might not be able to install this way, depending on how strict your environment is.
+
+> [!NOTE]  
+> If you run the script from an elevated terminal, it will install verapack for all users. Otherwise, it will just install it for the current user. -->
+
+<br/>
+
+Run below command in a Powershell terminal:
+
+```powershell
+Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; iex ((New-Object System.Net.WebClient).DownloadString('https://raw.githubusercontent.com/DanCreative/verapack/refs/heads/main/.install/ps/Install.ps1'));
+```
+
+</details>
+
+<details>
+<summary><strong>Option 3: Manual</strong></summary>
+
+<br/>
+
+Alternatively, you can download the latest build from the [releases](https://github.com/DanCreative/verapack/releases) tab. Then once the archive has been downloaded and extracted, you can move the binary inside to a directory that makes sense to you and add said directory path to your user account's `PATH` environment variable. E.g. `%Appdata%\verapack`
+
+</details>
+
 
 ## 📖 Basic User Guide
 
