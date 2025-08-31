@@ -1,32 +1,36 @@
-﻿# Please note:
-#   - This PowerShell script is not signed. You will not be able to run it in a strict environment.
-#   - Therefore, this script acts like a template that will be minified into a "one-liner" and added to the README during the release pipeline.
-#   - That "one-liner" can then be run from the user's terminal to perform the installation.
-
-$version="${version}";$arch="";$scope="";$path="";$ProgressPreference = 'SilentlyContinue';
+﻿$ProgressPreference = 'SilentlyContinue';$ErrorActionPreference = 'Stop';$arch="";$scope="";$path="";
 
 # Determine host machine architecture
-$osArch = [System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture;
-switch ($osArch) {arm64 {echo "arm64 is not currently supported";Return;}x86 {"32-bit is not currently supported";Return;}x64 {$arch = "amd64";}}
+$OSArch = (Get-CimInstance Win32_operatingsystem).OSArchitecture;switch ($OSArch) {"64-bit"{$arch = "amd64";}default {echo "$OSArch is not currently supported";Return;}}
 
 # Determine the installation scope
 if (([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator) -eq $true) {$scope = "Machine";$path = "C:\Program Files";} else {$scope = "User";$path = ([Environment]::GetEnvironmentVariable("appdata"));}
 $homeFolderPath = $("{0}\verapack" -f $path);
 
+# Retrieve the download URL for the latest package
+$req = Invoke-RestMethod -Uri "https://api.github.com/repos/DanCreative/verapack/releases/latest" -Method Get -ContentType "application/json";
+
+foreach ($asset in $req.assets) {
+    if ($asset.name -match "windows-$arch"){
+        $downloadUrl = $asset.browser_download_url;
+    }
+}
+
 # Download ZIP
-Invoke-WebRequest -OutFile $("{0}\{1}" -f ([Environment]::GetEnvironmentVariable("temp")), "verapack.zip") -Uri $('https://github.com/DanCreative/verapack/releases/latest/download/verapack-windows-{0}-{1}.zip' -f $arch,$version) -UseBasicParsing;
+Invoke-WebRequest -OutFile $("{0}\{1}" -f ([Environment]::GetEnvironmentVariable("temp")), "verapack.zip") -Uri $downloadUrl -UseBasicParsing;
 
 # Remove the old app
 if (Test-Path $homeFolderPath) {
     [System.IO.Directory]::Delete($homeFolderPath, $true);
 }
 
+New-Item -Path $homeFolderPath -ItemType Directory | Out-Null
+
 # Unzip new app in temp dir
 Expand-Archive -Path $("{0}\{1}" -f ([Environment]::GetEnvironmentVariable("temp"), "verapack.zip")) -DestinationPath ([Environment]::GetEnvironmentVariable("temp")) -Force;
-Rename-Item $("{0}\verapack-windows-{1}-{2}" -f ([Environment]::GetEnvironmentVariable("temp"), $arch, $version)) -NewName "verapack" -Force;
 
 # Move new app to install location
-Move-Item -Force -Path $("{0}\verapack" -f ([Environment]::GetEnvironmentVariable("temp"))) -Destination $path;
+Move-Item -Force -Path $("{0}\verapack.exe" -f ([Environment]::GetEnvironmentVariable("temp"))) -Destination "$homeFolderPath\verapack.exe";
 
 # Remove install files from temp
 [System.IO.File]::Delete($("{0}\{1}" -f ([Environment]::GetEnvironmentVariable("temp")), "verapack.zip"));

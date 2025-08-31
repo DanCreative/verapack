@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Do not remove this test for UTF-8: if “Ω” doesn’t appear as greek uppercase omega letter
+enclosed in quotation marks, you should use an editor that supports UTF-8, not this one. -->
+<package xmlns="http://schemas.microsoft.com/packaging/2015/06/nuspec.xsd">
+    <metadata>
+        <id>verapack</id>
+        <version>$version$</version>
+        <owners>DStadler</owners>
+        <title>Verapack CLI</title>
+        <authors>DStadler</authors>
+        <projectUrl>https://github.com/DanCreative/verapack/</projectUrl>
+        <licenseUrl>https://github.com/DanCreative/verapack/blob/main/LICENSE</licenseUrl>
+        <projectSourceUrl>https://github.com/DanCreative/verapack/</projectSourceUrl>
+        <bugTrackerUrl>https://github.com/DanCreative/verapack/issues</bugTrackerUrl>
+        <tags>verapack unofficial veracode cli portable</tags>
+        <releaseNotes>https://github.com/DanCreative/verapack/releases/latest</releaseNotes>
+        <summary>Verapack is a utility that automates and simplifies running Veracode SAST scans from your local machine.</summary>
+        <description>
+## ✨ Key Features
+
+- Convenient setup process that simplifies setting up local credential files and installs Veracode tools.
+- Manage all scanning configurations from a central `config.yaml` file.
+- Run a **Policy**-, **Sandbox**-, **Sandbox Promotion** or mixed scans asynchronously.
+- You can leave the scans running in the background and view the results in the application once the scans complete.
+- You can use a URL to the repo, path to the local project or provide a list of pre-built artefacts to scan for each of the different applications.
+- Use the [Veracode auto-packager](https://docs.veracode.com/r/About_auto_packaging) to automatically package the applications.
+- Check the latest versions of the installed tooling and automatically update them.
+- Automatically refresh API credentials and update local credential files. (API credentials expire after 1 year)
+        </description>
+    </metadata>
+    <files>
+        <file src="../../out/verapack-windows-*-v$version$.zip" target="tools" />
+        <file src="../../LICENSE.txt" target="tools" />
+        <file src="../../VERIFICATION.txt" target="tools" />
+        <file src="tools/**" target="tools" />
+    </files>
+</package>
