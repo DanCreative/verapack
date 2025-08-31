@@ -4,6 +4,7 @@ import (
 	_ "embed"
 	"net/url"
 	"os"
+	"regexp"
 	"strings"
 	"time"
 
@@ -188,7 +189,7 @@ func optionsStructLevelValidation(sl validator.StructLevel) {
 		}
 
 	case Repo:
-		if !isURL(options.PackageSource) {
+		if !isURL(options.PackageSource) && !isSCPLikeUrl(options.PackageSource) {
 			sl.ReportError(options.PackageSource, "PackageSource", "PackageSource", "package_source", "repo")
 		}
 	}
@@ -224,6 +225,21 @@ func isURL(value string) bool {
 	}
 
 	if url.Host == "" && url.Fragment == "" && url.Opaque == "" {
+		return false
+	}
+
+	return true
+}
+
+// isSCPLikeUrl validates whether the URL is in a SCP-like format. This format is typically used when
+// cloning a remote git repo using ssh.
+//
+// Credit to: https://github.com/whilp/git-urls/blob/master/urls.go and https://golang.org/src/cmd/go/vcs.go.
+func isSCPLikeUrl(value string) bool {
+	scpSyntax := regexp.MustCompile(`^([a-zA-Z0-9-._~]+@)?([a-zA-Z0-9._-]+):([a-zA-Z0-9./._-]+)(?:\?||$)(.*)$`)
+	match := scpSyntax.FindAllStringSubmatch(value, -1)
+
+	if len(match) == 0 {
 		return false
 	}
 
