@@ -69,27 +69,7 @@ func Setup_ui(cCtx *cli.Context) error {
 		})),
 	}
 
-	p := tea.NewProgram(multistagesetup.NewModel(
-		multistagesetup.WithSpinner(defaultSpinnerOpts...),
-		multistagesetup.WithStyles(multistagesetup.Styles{
-			StatusFailure:    multistagesetup.SummaryStyle{Symbol: '✗', Colour: red},
-			StatusSuccess:    multistagesetup.SummaryStyle{Symbol: '✓', Colour: green},
-			StatusWarning:    multistagesetup.SummaryStyle{Symbol: '⚠', Colour: orange},
-			StatusSkipped:    multistagesetup.SummaryStyle{Symbol: '✓', Colour: green, Style: lipgloss.NewStyle().Strikethrough(true)},
-			StatusTodo:       multistagesetup.SummaryStyle{Symbol: '!'},
-			StatusInProgress: lipgloss.NewStyle().Foreground(lightBlue),
-			StageBlock: lipgloss.NewStyle().Padding(0, 1).Margin(0, 0, 0, 2).
-				Border(lipgloss.RoundedBorder()).
-				BorderForeground(darkGray),
-			MsgText: darkGrayForeground,
-			FinalMessage: lipgloss.NewStyle().Padding(0, 1, 1, 1).Margin(0, 0, 0, 2).
-				Align(lipgloss.Center).
-				Border(lipgloss.RoundedBorder()).
-				BorderForeground(lightBlue),
-		}),
-		multistagesetup.WithTasks(tasks...),
-		multistagesetup.WithFinalMessage(fmt.Sprintf("%s\n\n%s", "Initial setup has been successfully completed. To complete the setup, please open below config file and add your applications with their scan settings:", lightBlueForeground.Render("C:\\Users\\user\\.veracode\\verapack\\config.yaml"))),
-	))
+	p := tea.NewProgram(PrepareSetup("C:\\Users\\user\\.veracode\\verapack\\config.yaml", tasks))
 	if _, err := p.Run(); err != nil {
 		return err
 	}
@@ -156,6 +136,7 @@ func Sandbox_ui(cCtx *cli.Context) error {
 		// Prompt the user for what they would like to do.
 		m = singleselect.NewModel(
 			singleselect.WithBodyText(renderBodyText(badApps)),
+			singleselect.WithHelp(defaultHelp),
 			singleselect.WithOptions(
 				"Only scan the applications with the provided field",
 				"Cancel the scan",
@@ -280,9 +261,8 @@ func packageAndUploadApplication_ui(options Options, appId int, reporter reporte
 
 		if appId > 1 && rand.IntN(4)+1 == 1 {
 			reporter.Send(reportcard.TaskResultMsg{
-				Status:  reportcard.Failure,
-				Index:   appId,
-				IsFatal: true,
+				Status: reportcard.Failure,
+				Index:  appId,
 				Output: `Veracode CLI v2.40.0 -- 8823f61
 	Please ensure your project builds successfully without any errors.
 
@@ -330,9 +310,8 @@ Total time taken to complete command: 46.724s`,
 	// Upload
 	if appId > 0 && rand.IntN(4)+1 == 1 {
 		reporter.Send(reportcard.TaskResultMsg{
-			Status:  reportcard.Failure,
-			Index:   appId,
-			IsFatal: true,
+			Status: reportcard.Failure,
+			Index:  appId,
 			Output: `[2025.06.01 19:12:26.380] Transaction ID: [123-123-123-124]
 [2025.06.01 19:12:28.940]
 [2025.06.01 19:12:28.940] Application profile "Verademo" (appid=0) was located.
@@ -406,10 +385,9 @@ Total time taken to complete command: 46.724s`,
 			})
 		} else {
 			reporter.Send(reportcard.TaskResultMsg{
-				Status:  reportcard.Failure,
-				Index:   appId,
-				IsFatal: true,
-				Output:  "The application did not pass the policy rules. Therefore auto-promotion was cancelled.",
+				Status: reportcard.Failure,
+				Index:  appId,
+				Output: "The application did not pass the policy rules. Therefore auto-promotion was cancelled.",
 			})
 		}
 
@@ -603,6 +581,7 @@ func Promote_ui(cCtx *cli.Context) error {
 		m = singleselect.NewModel(
 			singleselect.WithBodyText(renderBodyText(badApps)),
 			singleselect.WithOptions(opts...),
+			singleselect.WithHelp(defaultHelp),
 			singleselect.WithStyles(singleselect.Styles{
 				Highlight: lightBlueForeground,
 				Border: lipgloss.NewStyle().
@@ -752,45 +731,32 @@ func ConfigureCredentials_ui(cCtx *cli.Context) error {
 }
 
 func Update_ui(cCtx *cli.Context) error {
-	p := tea.NewProgram(multistagesetup.NewModel(
-		multistagesetup.WithSpinner(defaultSpinnerOpts...),
-		multistagesetup.WithStyles(multistagesetup.Styles{
-			StatusFailure:    multistagesetup.SummaryStyle{Symbol: '✗', Colour: red},
-			StatusSuccess:    multistagesetup.SummaryStyle{Symbol: '✓', Colour: green},
-			StatusWarning:    multistagesetup.SummaryStyle{Symbol: '⚠', Colour: orange},
-			StatusSkipped:    multistagesetup.SummaryStyle{Symbol: '✓', Colour: green, Style: lipgloss.NewStyle().Strikethrough(true)},
-			StatusTodo:       multistagesetup.SummaryStyle{Symbol: '!'},
-			StatusInProgress: lipgloss.NewStyle().Foreground(lightBlue),
-			StageBlock: lipgloss.NewStyle().Padding(0, 1).Margin(0, 0, 0, 2).
-				Border(lipgloss.RoundedBorder()).
-				BorderForeground(darkGray),
-			MsgText: darkGrayForeground,
-		}),
-		multistagesetup.WithTasks(
-			multistagesetup.NewSetupTask("Check prerequisites", NewSimpleTask(func(values map[string]any) tea.Cmd {
-				time.Sleep(200 * time.Millisecond)
-				return func() tea.Msg { return multistagesetup.NewSuccessfulTaskResult("", nil) }
-			})),
-			multistagesetup.NewSetupTask("Update Veracode CLI", NewSimpleTask(func(values map[string]any) tea.Cmd {
-				return func() tea.Msg {
-					time.Sleep(2 * time.Second)
-					return multistagesetup.NewSuccessfulTaskResult("successfully updated: 2.39.0 -> 2.40.0", nil)
-				}
-			})),
-			multistagesetup.NewSetupTask("Update Veracode Uploader", NewSimpleTask(func(values map[string]any) tea.Cmd {
-				return func() tea.Msg {
-					time.Sleep(400 * time.Millisecond)
-					return multistagesetup.NewSkippedTaskResult("already on the latest version: 24.10.15.0", nil)
-				}
-			})),
-			multistagesetup.NewSetupTask("Install SCA Agent", NewSimpleTask(func(values map[string]any) tea.Cmd {
-				return func() tea.Msg {
-					time.Sleep(1 * time.Second)
-					return multistagesetup.NewSuccessfulTaskResult("successfully installed", nil)
-				}
-			})),
-		),
-	))
+	p := tea.NewProgram(PrepareUpdate([]multistagesetup.SetupTask{
+		multistagesetup.NewSetupTask("Check prerequisites", NewSimpleTask(func(values map[string]any) tea.Cmd {
+			time.Sleep(200 * time.Millisecond)
+			return func() tea.Msg { return multistagesetup.NewSuccessfulTaskResult("", nil) }
+		})),
+		multistagesetup.NewSetupTask("Update Veracode CLI", NewSimpleTask(func(values map[string]any) tea.Cmd {
+			return func() tea.Msg {
+				time.Sleep(2 * time.Second)
+				return multistagesetup.NewSuccessfulTaskResult("successfully updated: 2.39.0 -> 2.40.0", nil)
+			}
+		})),
+		multistagesetup.NewSetupTask("Update Veracode Uploader", NewSimpleTask(func(values map[string]any) tea.Cmd {
+			return func() tea.Msg {
+				time.Sleep(400 * time.Millisecond)
+				return multistagesetup.NewSkippedTaskResult("already on the latest version: 24.10.15.0", nil)
+			}
+		})),
+		multistagesetup.NewSetupTask("Install SCA Agent", NewSimpleTask(func(values map[string]any) tea.Cmd {
+			return func() tea.Msg {
+				time.Sleep(1 * time.Second)
+				return multistagesetup.NewSuccessfulTaskResult("successfully installed", nil)
+			}
+		})),
+	},
+	),
+	)
 	if _, err := p.Run(); err != nil {
 		return err
 	}
@@ -879,6 +845,7 @@ func VersionPrinter_ui(cCtx *cli.Context) {
 			}),
 			spinner.WithStyle(darkGrayForeground),
 		}...),
+		version.WithHelp(defaultHelp),
 		version.WithStyles(version.Styles{
 			Muted: darkGrayForeground,
 			Loud:  lipgloss.NewStyle().Foreground(orange),

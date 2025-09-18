@@ -9,6 +9,7 @@ import (
 
 	"github.com/DanCreative/veracode-go/veracode"
 	"github.com/DanCreative/verapack/internal/components/reportcard"
+	"github.com/charmbracelet/bubbles/runeutil"
 	tea "github.com/charmbracelet/bubbletea"
 )
 
@@ -24,6 +25,7 @@ type reporter interface {
 // to be set in the config. If PackageSource is set, PackageApplication will be run and set it.
 func packageAndUploadApplication(uploaderPath string, options Options, appId int, reporter reporter, client *veracode.Client, ctx context.Context) error {
 	var err error
+	sanitizer := runeutil.NewSanitizer()
 
 	// packageOutputBaseDirectory is the path to the individual apps' temp folder.
 	// It will contain a source clone folder and an artefact output folder.
@@ -32,10 +34,9 @@ func packageAndUploadApplication(uploaderPath string, options Options, appId int
 	logWriter, closeFunc, err := initializeLogWriter(options.AppName)
 	if err != nil {
 		reporter.Send(reportcard.TaskResultMsg{
-			Status:  reportcard.Failure,
-			Output:  err.Error(),
-			Index:   appId,
-			IsFatal: true,
+			Status: reportcard.Failure,
+			Output: err.Error(),
+			Index:  appId,
 		})
 		return err
 	}
@@ -50,10 +51,9 @@ func packageAndUploadApplication(uploaderPath string, options Options, appId int
 		packageOutputBaseDirectory, err = createAppPackagingOutputDir(options.AppName)
 		if err != nil {
 			reporter.Send(reportcard.TaskResultMsg{
-				Status:  reportcard.Failure,
-				Output:  err.Error(),
-				Index:   appId,
-				IsFatal: true,
+				Status: reportcard.Failure,
+				Output: err.Error(),
+				Index:  appId,
 			})
 			return err
 		}
@@ -67,10 +67,9 @@ func packageAndUploadApplication(uploaderPath string, options Options, appId int
 			cloneOut, err = CloneRepository(options, filepath.Join(packageOutputBaseDirectory, "source"), logWriter)
 			if err != nil {
 				reporter.Send(reportcard.TaskResultMsg{
-					Status:  reportcard.Failure,
-					Output:  cloneOut,
-					Index:   appId,
-					IsFatal: true,
+					Status: reportcard.Failure,
+					Output: string(sanitizer.Sanitize([]rune(cloneOut))),
+					Index:  appId,
 				})
 				cleanupTask(options, packageOutputBaseDirectory, appId, reporter, logWriter)
 				return err
@@ -91,10 +90,9 @@ func packageAndUploadApplication(uploaderPath string, options Options, appId int
 
 		if err != nil {
 			reporter.Send(reportcard.TaskResultMsg{
-				Status:  reportcard.Failure,
-				Output:  out,
-				Index:   appId,
-				IsFatal: true,
+				Status: reportcard.Failure,
+				Output: string(sanitizer.Sanitize([]rune(out))),
+				Index:  appId,
 			})
 			cleanupTask(options, packageOutputBaseDirectory, appId, reporter, logWriter)
 			return err
@@ -121,10 +119,9 @@ func packageAndUploadApplication(uploaderPath string, options Options, appId int
 	out, err := UploadAndScanApplication(options, logWriter)
 	if err != nil {
 		reporter.Send(reportcard.TaskResultMsg{
-			Status:  reportcard.Failure,
-			Output:  out,
-			Index:   appId,
-			IsFatal: true,
+			Status: reportcard.Failure,
+			Output: string(sanitizer.Sanitize([]rune(out))),
+			Index:  appId,
 		})
 		cleanupTask(options, packageOutputBaseDirectory, appId, reporter, logWriter)
 		return err
@@ -133,7 +130,7 @@ func packageAndUploadApplication(uploaderPath string, options Options, appId int
 	reporter.Send(reportcard.TaskResultMsg{
 		Status: reportcard.Success,
 		Index:  appId,
-		Output: out,
+		Output: string(sanitizer.Sanitize([]rune(out))),
 	})
 
 	cleanupTask(options, packageOutputBaseDirectory, appId, reporter, logWriter)
@@ -165,10 +162,9 @@ func cleanupTask(options Options, packageOutputBaseDirectory string, appId int, 
 			fmt.Fprintf(writer, "BEGIN (%s)\n%s\nEND (%s)\n", columnCleanup, err, columnCleanup)
 
 			reporter.Send(reportcard.TaskResultMsg{
-				Status:  reportcard.Failure,
-				Output:  err.Error(),
-				Index:   appId,
-				IsFatal: false,
+				Status: reportcard.Failure,
+				Output: err.Error(),
+				Index:  appId,
 			})
 		} else {
 			reporter.Send(reportcard.TaskResultMsg{
@@ -183,10 +179,9 @@ func waitForResultTask(ctx context.Context, client *veracode.Client, options Opt
 	result, out, err := WaitForResult(ctx, client, options, reporter)
 	if err != nil {
 		reporter.Send(reportcard.TaskResultMsg{
-			Status:  reportcard.Failure,
-			Output:  out,
-			Index:   appId,
-			IsFatal: true,
+			Status: reportcard.Failure,
+			Output: out,
+			Index:  appId,
 		})
 
 		return err
@@ -195,7 +190,6 @@ func waitForResultTask(ctx context.Context, client *veracode.Client, options Opt
 	// taskResult is re-used to send both the custom status for the Result column and the Policy column (if it is a policy scan)
 	taskResult := reportcard.TaskResultMsg{
 		Status: reportcard.Success,
-		Output: out,
 		Index:  appId,
 	}
 
@@ -215,10 +209,9 @@ func autoPromoteTask(ctx context.Context, client *veracode.Client, options Optio
 	if err != nil {
 		fmt.Fprintf(writer, "BEGIN (%s)\n%s\nEND (%s)\n", columnResult, err, columnResult)
 		reporter.Send(reportcard.TaskResultMsg{
-			Status:  reportcard.Failure,
-			Output:  out,
-			Index:   appId,
-			IsFatal: true,
+			Status: reportcard.Failure,
+			Output: out,
+			Index:  appId,
 		})
 
 		return err
@@ -227,7 +220,6 @@ func autoPromoteTask(ctx context.Context, client *veracode.Client, options Optio
 	// Result column
 	taskResult := reportcard.TaskResultMsg{
 		Status:              reportcard.Success,
-		Output:              out,
 		Index:               appId,
 		CustomSuccessStatus: createCustomTaskStatusFromResult(res, false),
 	}
@@ -240,10 +232,9 @@ func autoPromoteTask(ctx context.Context, client *veracode.Client, options Optio
 		if err != nil {
 			fmt.Fprintf(writer, "BEGIN (%s)\n%s\nEND (%s)\n", columnPromote, err, columnPromote)
 			reporter.Send(reportcard.TaskResultMsg{
-				Status:  reportcard.Failure,
-				Index:   appId,
-				Output:  err.Error(),
-				IsFatal: true,
+				Status: reportcard.Failure,
+				Index:  appId,
+				Output: err.Error(),
 			})
 			return err
 		}
@@ -256,10 +247,9 @@ func autoPromoteTask(ctx context.Context, client *veracode.Client, options Optio
 	} else {
 		fmt.Fprintf(writer, "BEGIN (%s)\n%s\nEND (%s)\n", columnPromote, err, columnPromote)
 		reporter.Send(reportcard.TaskResultMsg{
-			Status:  reportcard.Failure,
-			Index:   appId,
-			Output:  "The application did not pass the policy rules. Therefore auto-promotion was cancelled.",
-			IsFatal: true,
+			Status: reportcard.Failure,
+			Index:  appId,
+			Output: "The application did not pass the policy rules. Therefore auto-promotion was cancelled.",
 		})
 
 		return nil
@@ -270,10 +260,9 @@ func autoPromoteTask(ctx context.Context, client *veracode.Client, options Optio
 	if err != nil {
 		fmt.Fprintf(writer, "BEGIN (%s)\n%s\nEND (%s)\n", columnPolicy, err, columnPolicy)
 		reporter.Send(reportcard.TaskResultMsg{
-			Status:  reportcard.Failure,
-			Index:   appId,
-			Output:  err.Error(),
-			IsFatal: true,
+			Status: reportcard.Failure,
+			Index:  appId,
+			Output: err.Error(),
 		})
 		return err
 	}

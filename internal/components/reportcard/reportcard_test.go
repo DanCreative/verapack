@@ -1,216 +1,135 @@
 package reportcard
 
-import "testing"
+import (
+	"fmt"
+	"reflect"
+	"testing"
+)
 
-func newTestSelector[T any](selectables [][]*T, selectedCol, selectedRow int) *selector[T] {
-	return &selector[T]{
-		selectedItemRow:    selectedRow,
-		selectedItemColumn: selectedCol,
-		selectableItems:    selectables,
-	}
+type update func(r *Row, msg TaskResultMsg)
+
+func uf(r *Row, msg TaskResultMsg) {
+	r.update(msg)
 }
 
-func Test_selector_MoveCursor(t *testing.T) {
-	type args struct {
-		direction direction
-	}
+type arg struct {
+	uf  update
+	msg TaskResultMsg
+}
+
+func Test_row_update(t *testing.T) {
 	tests := []struct {
-		name    string
-		s       *selector[struct{}]
-		args    args
-		wantRow int
-		wantCol int
+		name          string
+		r             *Row
+		args          []arg
+		wantRowStatus RowStatus
+		wantRowTasks  []Task
 	}{
 		{
-			name: "Move 1 left",
-			s:    newTestSelector([][]*struct{}{{nil, &struct{}{}, nil}}, 2, 0),
-			args: args{
-				direction: left,
+			name: "on task one, success",
+			r: &Row{
+				status:           RowNotStarted,
+				columnsReference: map[string]int{"t1": 0, "t2": 1, "t3": 2},
+				tasks:            []Task{{status: NotStarted, name: "t1"}, {status: NotStarted, name: "t2"}, {status: NotStarted, name: "t3"}},
 			},
-			wantRow: 0,
-			wantCol: 1,
+			args:          []arg{{uf: uf, msg: TaskResultMsg{Status: Success}}},
+			wantRowStatus: RowStarted,
+			wantRowTasks:  []Task{{name: "t1", status: Success}, {name: "t2", status: InProgress}, {name: "t3", status: NotStarted}},
 		},
 		{
-			name: "Jump column(s) left",
-			s:    newTestSelector([][]*struct{}{{&struct{}{}, nil, &struct{}{}}}, 2, 0),
-			args: args{
-				direction: left,
+			name: "all tasks skipped, success",
+			r: &Row{
+				status:           RowNotStarted,
+				columnsReference: map[string]int{"t1": 0, "t2": 1, "t3": 2},
+				tasks:            []Task{{status: Skip, name: "t1"}, {status: Skip, name: "t2"}, {status: Skip, name: "t3"}},
 			},
-			wantRow: 0,
-			wantCol: 0,
+			args:          []arg{{uf: uf, msg: TaskResultMsg{Status: Success}}},
+			wantRowStatus: RowSuccess,
+			wantRowTasks:  []Task{{name: "t1", status: Skip}, {name: "t2", status: Skip}, {name: "t3", status: Skip}},
 		},
 		{
-			name: "No move left",
-			s:    newTestSelector([][]*struct{}{{nil, nil, &struct{}{}}}, 2, 0),
-			args: args{
-				direction: left,
+			name: "skipped 2 starting tasks, success",
+			r: &Row{
+				status:           RowNotStarted,
+				columnsReference: map[string]int{"t1": 0, "t2": 1, "t3": 2},
+				tasks:            []Task{{status: Skip, name: "t1"}, {status: Skip, name: "t2"}, {status: NotStarted, name: "t3"}},
 			},
-			wantRow: 0,
-			wantCol: 2,
+			args:          []arg{{uf: uf, msg: TaskResultMsg{Status: Success}}},
+			wantRowStatus: RowSuccess,
+			wantRowTasks:  []Task{{name: "t1", status: Skip}, {name: "t2", status: Skip}, {name: "t3", status: Success}},
 		},
 		{
-			name: "No move left border",
-			s:    newTestSelector([][]*struct{}{{&struct{}{}}}, 0, 0),
-			args: args{
-				direction: left,
+			name: "skipped tasks in between, success",
+			r: &Row{
+				status:           RowNotStarted,
+				columnsReference: map[string]int{"t1": 0, "t2": 1, "t3": 2, "t4": 3},
+				tasks:            []Task{{status: NotStarted, name: "t1"}, {status: Skip, name: "t2"}, {status: Skip, name: "t3"}, {status: NotStarted, name: "t4"}},
 			},
-			wantRow: 0,
-			wantCol: 0,
+			wantRowStatus: RowStarted,
+			wantRowTasks:  []Task{{status: Success, name: "t1"}, {status: Skip, name: "t2"}, {status: Skip, name: "t3"}, {status: InProgress, name: "t4"}},
+			args:          []arg{{uf: uf, msg: TaskResultMsg{Status: Success}}},
 		},
 		{
-			name: "Move 1 right",
-			s:    newTestSelector([][]*struct{}{{&struct{}{}, &struct{}{}, nil}}, 0, 0),
-			args: args{
-				direction: right,
+			name: "failure occurred",
+			r: &Row{
+				status:           RowNotStarted,
+				columnsReference: map[string]int{"t1": 0, "t2": 1, "t3": 2, "t4": 3},
+				tasks:            []Task{{status: NotStarted, name: "t1"}, {status: Skip, name: "t2"}, {status: NotStarted, name: "t3"}, {status: NotStarted, name: "t4"}},
 			},
-			wantRow: 0,
-			wantCol: 1,
+			wantRowStatus: RowFailure,
+			wantRowTasks:  []Task{{status: Success, name: "t1"}, {status: Skip, name: "t2"}, {status: Failure, name: "t3"}, {status: Skip, name: "t4"}},
+			args:          []arg{{uf: uf, msg: TaskResultMsg{Status: Success}}, {uf: uf, msg: TaskResultMsg{Status: Failure}}},
 		},
 		{
-			name: "Jump column(s) right",
-			s:    newTestSelector([][]*struct{}{{&struct{}{}, nil, &struct{}{}}}, 0, 0),
-			args: args{
-				direction: right,
+			name: "warning occurred",
+			r: &Row{
+				status:           RowNotStarted,
+				columnsReference: map[string]int{"t1": 0, "t2": 1, "t3": 2, "t4": 3},
+				tasks:            []Task{{status: NotStarted, name: "t1"}, {status: Skip, name: "t2"}, {status: NotStarted, name: "t3"}, {status: NotStarted, name: "t4"}},
 			},
-			wantRow: 0,
-			wantCol: 2,
+			wantRowStatus: RowWarning,
+			wantRowTasks:  []Task{{status: Warning, name: "t1"}, {status: Skip, name: "t2"}, {status: Success, name: "t3"}, {status: Success, name: "t4"}},
+			args:          []arg{{uf: uf, msg: TaskResultMsg{Status: Warning}}, {uf: uf, msg: TaskResultMsg{Status: Success}}, {uf: uf, msg: TaskResultMsg{Status: Success}}},
 		},
 		{
-			name: "No move right",
-			s:    newTestSelector([][]*struct{}{{&struct{}{}, nil, nil}}, 0, 0),
-			args: args{
-				direction: right,
+			name: "can run anyway, still in progress",
+			r: &Row{
+				status:           RowNotStarted,
+				columnsReference: map[string]int{"t1": 0, "t2": 1, "t3": 2, "t4": 3},
+				tasks:            []Task{{status: NotStarted, name: "t1"}, {status: NotStarted, name: "t2"}, {status: NotStarted, name: "t3", shouldRunAnywayFor: []string{"t1", "t2"}}, {status: NotStarted, name: "t4"}},
 			},
-			wantRow: 0,
-			wantCol: 0,
+			args:          []arg{{uf: uf, msg: TaskResultMsg{Status: Failure}}},
+			wantRowStatus: RowStarted,
+			wantRowTasks:  []Task{{status: Failure, name: "t1"}, {status: Skip, name: "t2"}, {status: InProgress, name: "t3", shouldRunAnywayFor: []string{"t1", "t2"}}, {status: Skip, name: "t4"}},
 		},
 		{
-			name: "No move right border",
-			s:    newTestSelector([][]*struct{}{{nil, nil, &struct{}{}}}, 2, 0),
-			args: args{
-				direction: right,
+			name: "can run anyway, after remaining tasks complete",
+			r: &Row{
+				status:           RowNotStarted,
+				columnsReference: map[string]int{"t1": 0, "t2": 1, "t3": 2, "t4": 3},
+				tasks:            []Task{{status: NotStarted, name: "t1"}, {status: NotStarted, name: "t2"}, {status: NotStarted, name: "t3", shouldRunAnywayFor: []string{"t1", "t2"}}, {status: NotStarted, name: "t4"}},
 			},
-			wantRow: 0,
-			wantCol: 2,
-		},
-		{
-			name: "Move 1 row down same column",
-			s:    newTestSelector([][]*struct{}{{nil, &struct{}{}, nil}, {nil, &struct{}{}, nil}}, 1, 0),
-			args: args{
-				direction: down,
-			},
-			wantRow: 1,
-			wantCol: 1,
-		},
-		{
-			name: "Move 1 row down different column",
-			s:    newTestSelector([][]*struct{}{{nil, &struct{}{}, nil}, {nil, nil, &struct{}{}}}, 1, 0),
-			args: args{
-				direction: down,
-			},
-			wantRow: 1,
-			wantCol: 2,
-		},
-		{
-			name: "Move 1 row down with multiple rows and different column",
-			s:    newTestSelector([][]*struct{}{{nil, &struct{}{}, nil}, {&struct{}{}, nil, nil}, {nil, nil, &struct{}{}}}, 1, 0),
-			args: args{
-				direction: down,
-			},
-			wantRow: 1,
-			wantCol: 0,
-		},
-		{
-			name: "Jump rows down with different column",
-			s:    newTestSelector([][]*struct{}{{nil, &struct{}{}, nil}, {nil, nil, nil}, {nil, nil, &struct{}{}}}, 1, 0),
-			args: args{
-				direction: down,
-			},
-			wantRow: 2,
-			wantCol: 2,
-		},
-		{
-			name: "No move down",
-			s:    newTestSelector([][]*struct{}{{nil, nil, nil}, {nil, &struct{}{}, nil}, {nil, nil, nil}}, 1, 1),
-			args: args{
-				direction: down,
-			},
-			wantRow: 1,
-			wantCol: 1,
-		},
-		{
-			name: "No move down border",
-			s:    newTestSelector([][]*struct{}{{nil, &struct{}{}, nil}}, 1, 0),
-			args: args{
-				direction: down,
-			},
-			wantRow: 0,
-			wantCol: 1,
-		},
-		{
-			name: "Move 1 row up same column",
-			s:    newTestSelector([][]*struct{}{{nil, &struct{}{}, nil}, {nil, &struct{}{}, nil}}, 1, 1),
-			args: args{
-				direction: up,
-			},
-			wantRow: 0,
-			wantCol: 1,
-		},
-		{
-			name: "Move 1 row up different column",
-			s:    newTestSelector([][]*struct{}{{nil, &struct{}{}, nil}, {nil, nil, &struct{}{}}}, 2, 1),
-			args: args{
-				direction: up,
-			},
-			wantRow: 0,
-			wantCol: 1,
-		},
-		{
-			name: "Jump rows up with different column",
-			s:    newTestSelector([][]*struct{}{{nil, &struct{}{}, nil}, {nil, nil, nil}, {nil, nil, &struct{}{}}}, 2, 2),
-			args: args{
-				direction: up,
-			},
-			wantRow: 0,
-			wantCol: 1,
-		},
-		{
-			name: "No move up",
-			s:    newTestSelector([][]*struct{}{{nil, nil, nil}, {nil, &struct{}{}, nil}, {nil, nil, nil}}, 1, 1),
-			args: args{
-				direction: up,
-			},
-			wantRow: 1,
-			wantCol: 1,
-		},
-		{
-			name: "No move up border",
-			s:    newTestSelector([][]*struct{}{{nil, &struct{}{}, nil}}, 1, 0),
-			args: args{
-				direction: up,
-			},
-			wantRow: 0,
-			wantCol: 1,
-		},
-		{
-			name: "Move 1 up down with multiple rows and different column",
-			s:    newTestSelector([][]*struct{}{{nil, &struct{}{}, nil}, {nil, nil, nil}, {nil, nil, &struct{}{}}}, 2, 2),
-			args: args{
-				direction: up,
-			},
-			wantRow: 0,
-			wantCol: 1,
+			args:          []arg{{uf: uf, msg: TaskResultMsg{Status: Failure}}, {uf: uf, msg: TaskResultMsg{Status: Success}}},
+			wantRowStatus: RowFailure,
+			wantRowTasks:  []Task{{status: Failure, name: "t1"}, {status: Skip, name: "t2"}, {status: Success, name: "t3", shouldRunAnywayFor: []string{"t1", "t2"}}, {status: Skip, name: "t4"}},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, gotRow, gotCol, _ := tt.s.MoveCursor(tt.args.direction, 1)
-			if gotRow != tt.wantRow {
-				t.Errorf("selector.MoveCursor() gotRow = %v, want %v", gotRow, tt.wantRow)
+			tt.r.start()
+
+			for _, cmd := range tt.args {
+				cmd.uf(tt.r, cmd.msg)
 			}
-			if gotCol != tt.wantCol {
-				t.Errorf("selector.MoveCursor() gotCol = %v, want %v", gotCol, tt.wantCol)
+
+			if !reflect.DeepEqual(tt.r.status, tt.wantRowStatus) {
+				t.Errorf("row.update() = %v, want %v", tt.r.status, tt.wantRowStatus)
 			}
+
+			if !reflect.DeepEqual(tt.r.tasks, tt.wantRowTasks) {
+				t.Errorf("row.update(), row.Tasks = %+v, \nwant %+v", tt.r.tasks, tt.wantRowTasks)
+			}
+			fmt.Printf("row: %+v\n", tt.r)
 		})
 	}
 }
