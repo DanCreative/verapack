@@ -44,10 +44,9 @@ func promoteSandbox(client *veracode.Client, ctx context.Context, app Options, a
 	_, _, err := client.Sandbox.PromoteSandbox(ctx, app.AppGuid, app.SandboxGuid, true)
 	if err != nil {
 		reporter.Send(reportcard.TaskResultMsg{
-			Status:  reportcard.Failure,
-			Output:  err.Error(),
-			Index:   appId,
-			IsFatal: true,
+			Status: reportcard.Failure,
+			Output: err.Error(),
+			Index:  appId,
 		})
 		return
 	}
@@ -55,7 +54,6 @@ func promoteSandbox(client *veracode.Client, ctx context.Context, app Options, a
 	reporter.Send(reportcard.TaskResultMsg{
 		Status: reportcard.Success,
 		Index:  appId,
-		Output: "",
 	})
 }
 

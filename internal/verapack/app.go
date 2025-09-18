@@ -102,7 +102,7 @@ func setup(cCtx *cli.Context) error {
 		return err
 	}
 
-	tasks := []multistagesetup.SetupTask{
+	p := tea.NewProgram(PrepareSetup(appDir, []multistagesetup.SetupTask{
 		Prerequisites(),
 		SetupCredentialsUserPrompt(veracode.LoadVeracodeCredentials),
 		SetupCredentialsFile(homeDir),
@@ -111,29 +111,21 @@ func setup(cCtx *cli.Context) error {
 		SetupInstallDependencyPackager(),
 		SetupInstallDependencyWrapper(),
 		SetupInstallScaAgent(),
+	}))
+
+	if _, err := p.Run(); err != nil {
+		return err
 	}
 
-	p := tea.NewProgram(multistagesetup.NewModel(
-		multistagesetup.WithSpinner(defaultSpinnerOpts...),
-		multistagesetup.WithStyles(multistagesetup.Styles{
-			StatusFailure:    multistagesetup.SummaryStyle{Symbol: '✗', Colour: red},
-			StatusSuccess:    multistagesetup.SummaryStyle{Symbol: '✓', Colour: green},
-			StatusWarning:    multistagesetup.SummaryStyle{Symbol: '⚠', Colour: orange},
-			StatusSkipped:    multistagesetup.SummaryStyle{Symbol: '✓', Colour: green, Style: lipgloss.NewStyle().Strikethrough(true)},
-			StatusTodo:       multistagesetup.SummaryStyle{Symbol: '!'},
-			StatusInProgress: lipgloss.NewStyle().Foreground(lightBlue),
-			StageBlock: lipgloss.NewStyle().Padding(0, 1).Margin(0, 0, 0, 2).
-				Border(lipgloss.RoundedBorder()).
-				BorderForeground(darkGray),
-			MsgText: darkGrayForeground,
-			FinalMessage: lipgloss.NewStyle().Padding(0, 1, 1, 1).Margin(0, 0, 0, 2).
-				Align(lipgloss.Center).
-				Border(lipgloss.RoundedBorder()).
-				BorderForeground(lightBlue),
-		}),
-		multistagesetup.WithTasks(tasks...),
-		multistagesetup.WithFinalMessage(fmt.Sprintf("%s\n\n%s", "Initial setup has been successfully completed. To complete the setup, please open below config file and add your applications with their scan settings:", lightBlueForeground.Render(filepath.Join(appDir, "config.yaml")))),
-	))
+	return nil
+}
+
+func update(cCtx *cli.Context) error {
+	p := tea.NewProgram(PrepareUpdate([]multistagesetup.SetupTask{
+		Prerequisites(),
+		UpdateDependencyPackager(),
+		UpdateDependencyWrapper(),
+		SetupInstallScaAgent()}))
 	if _, err := p.Run(); err != nil {
 		return err
 	}
@@ -181,6 +173,7 @@ func sandbox(cCtx *cli.Context) error {
 		// There are apps that do not have the SandboxName field set.
 		// Prompt the user for what they would like to do.
 		m = singleselect.NewModel(
+			singleselect.WithHelp(defaultHelp),
 			singleselect.WithBodyText(renderBodyText(badApps)),
 			singleselect.WithOptions(
 				"Only scan the applications with the provided field",
@@ -446,6 +439,7 @@ func promote(cCtx *cli.Context) error {
 		m = singleselect.NewModel(
 			singleselect.WithBodyText(renderBodyText(badApps)),
 			singleselect.WithOptions(opts...),
+			singleselect.WithHelp(defaultHelp),
 			singleselect.WithStyles(singleselect.Styles{
 				Highlight: lightBlueForeground,
 				Border: lipgloss.NewStyle().
@@ -591,35 +585,6 @@ func configureCredentials(cCtx *cli.Context) error {
 	return nil
 }
 
-func update(cCtx *cli.Context) error {
-	p := tea.NewProgram(multistagesetup.NewModel(
-		multistagesetup.WithSpinner(defaultSpinnerOpts...),
-		multistagesetup.WithStyles(multistagesetup.Styles{
-			StatusFailure:    multistagesetup.SummaryStyle{Symbol: '✗', Colour: red},
-			StatusSuccess:    multistagesetup.SummaryStyle{Symbol: '✓', Colour: green},
-			StatusWarning:    multistagesetup.SummaryStyle{Symbol: '⚠', Colour: orange},
-			StatusSkipped:    multistagesetup.SummaryStyle{Symbol: '✓', Colour: green, Style: lipgloss.NewStyle().Strikethrough(true)},
-			StatusTodo:       multistagesetup.SummaryStyle{Symbol: '!'},
-			StatusInProgress: lipgloss.NewStyle().Foreground(lightBlue),
-			StageBlock: lipgloss.NewStyle().Padding(0, 1).Margin(0, 0, 0, 2).
-				Border(lipgloss.RoundedBorder()).
-				BorderForeground(darkGray),
-			MsgText: darkGrayForeground,
-		}),
-		multistagesetup.WithTasks(
-			Prerequisites(),
-			UpdateDependencyPackager(),
-			UpdateDependencyWrapper(),
-			SetupInstallScaAgent(),
-		),
-	))
-	if _, err := p.Run(); err != nil {
-		return err
-	}
-
-	return nil
-}
-
 func VersionPrinter(cCtx *cli.Context) {
 	jar, _ := cookiejar.New(&cookiejar.Options{})
 
@@ -646,6 +611,7 @@ func VersionPrinter(cCtx *cli.Context) {
 			}),
 			spinner.WithStyle(darkGrayForeground),
 		}...),
+		version.WithHelp(defaultHelp),
 		version.WithStyles(version.Styles{
 			Muted: darkGrayForeground,
 			Loud:  lipgloss.NewStyle().Foreground(orange),

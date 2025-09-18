@@ -132,6 +132,12 @@ func WithStyles(styles Styles) Option {
 	}
 }
 
+func WithHelp(help help.Model) Option {
+	return func(m *Model) {
+		m.help = help
+	}
+}
+
 // WithOptions sets the options for the multiselect.
 func WithOptions(options ...string) Option {
 	return func(m *Model) {

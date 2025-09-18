@@ -9,8 +9,6 @@ import (
 	"path/filepath"
 	"strconv"
 	"time"
-
-	"github.com/charmbracelet/bubbles/runeutil"
 )
 
 var (
@@ -90,8 +88,7 @@ func PackageApplication(options Options, outputDirPath string, writer io.Writer)
 
 	err = cmd.Run()
 
-	sanitizer := runeutil.NewSanitizer()
-	out := string(sanitizer.Sanitize([]rune(outBuffer.String())))
+	out := outBuffer.String()
 
 	if err != nil {
 		return nil, err.Error() + "\n" + out, errPackagingErr

@@ -7,8 +7,6 @@ import (
 	"io"
 	"os/exec"
 	"strconv"
-
-	"github.com/charmbracelet/bubbles/runeutil"
 )
 
 var (
@@ -70,8 +68,7 @@ func UploadAndScanApplication(options Options, writer io.Writer) (string, error)
 
 	err = cmd.Run()
 
-	sanitizer := runeutil.NewSanitizer()
-	out := string(sanitizer.Sanitize([]rune(outBuffer.String())))
+	out := outBuffer.String()
 
 	fmt.Fprintf(writer, "END (%s)\n", columnUpload)
 

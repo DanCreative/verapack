@@ -35,9 +35,13 @@ Enter
 
 Sleep 2s
 
-Type@2s "gt"
+Down
 
-Sleep 2s
+Sleep 1s
+
+Up
+
+Sleep 1s
 
 Wait+Screen /⛊ C.PASS/
 
@@ -50,7 +54,7 @@ PageUp 1
 
 Sleep 500ms 
 
-Right
+Left
 
 Sleep 1s
 
@@ -58,15 +62,15 @@ Down
 
 Sleep 1s
 
-Left 
+Down 
 
 Sleep 1s
 
-Up
+Left
 
 Sleep 1s
 
-Type "s"
+Down 
 
 Sleep 15s
 
