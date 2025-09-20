@@ -39,7 +39,7 @@ jobs:
       run: |
         sudo apt-get install zip gzip tar
         mkdir out
-        zip -j out/verapack-${{ matrix.os }}-${{ matrix.arch }}-${{ github.ref_name }}.zip verapack.*
+        zip -j out/verapack-${{ matrix.os }}-${{ matrix.arch }}-${{ github.ref_name }}.zip verapack.* .install/batch/install.cmd
 
     - name: Upload Artifacts
       uses: actions/upload-artifact@v4
