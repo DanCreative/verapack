@@ -138,13 +138,14 @@ While the user is on the report card screen, they can press below buttons to nav
 
 Keys | Action
 ---|---
-<kbd>s</kbd> | Show the log output for the task that the user has selected.
-<kbd>left</kbd>, <kbd>right</kbd>, <kbd>up</kbd>, <kbd>down</kbd> | The user can use the arrow keys to move around.
+<kbd>up</kbd>, <kbd>down</kbd> | The user can use the up and down arrow keys to select different applications.
+<kbd>s</kbd> | Show the log output for the pertinent task, for the application that the user has selected.
+<kbd>left</kbd>, <kbd>right</kbd> | While a task is selected, the user can navigate between tasks for an application, by using the left and right arrow keys.
 <kbd>t</kbd>, <kbd>g</kbd> | Page up or down on the list of applications.
 <kbd>b</kbd>, <kbd>f</kbd> | Page up or down in the log output, if it is open.
 <kbd>k</kbd>, <kbd>j</kbd> | Go up or down one line in the log output, if it is open.
 <kbd>ctrl + c</kbd> | Quit the program.
-<kbd>?</kbd> | See a full list of the keys available.
+<kbd>?</kbd> | See the full list of the keys available.
 
 ### 4. Stay up to date
 

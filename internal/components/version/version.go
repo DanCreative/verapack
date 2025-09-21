@@ -156,6 +156,12 @@ func WithSpinner(opts ...spinner.Option) Option {
 	}
 }
 
+func WithHelp(help help.Model) Option {
+	return func(m *Model) {
+		m.help = help
+	}
+}
+
 func packagerVersionPrinter(msg versionMsg, m Model) string {
 	var packagerVersion string
 	if m.packagerLocalVersion == "na" {

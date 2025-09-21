@@ -359,6 +359,12 @@ func WithTasks(tasks ...SetupTask) Option {
 	}
 }
 
+func WithHelp(help help.Model) Option {
+	return func(m *Model) {
+		m.Help = help
+	}
+}
+
 // WithSpinner sets the spinner options for the report card.
 func WithSpinner(opts ...spinner.Option) Option {
 	return func(m *Model) {

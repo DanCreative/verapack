@@ -64,6 +64,7 @@ type Options struct {
 	Type          SourceType `yaml:"type" validate:"oneof=directory repo"`
 
 	// Other options:
+
 	ScanType ScanType `yaml:"-"` // The type of scan to run. Can be either policy or sandbox at this stage.
 	Branch   string   `yaml:"branch"`
 }
