@@ -9,7 +9,7 @@ enclosed in quotation marks, you should use an editor that supports UTF-8, not t
         <title>Verapack CLI</title>
         <authors>DStadler</authors>
         <projectUrl>https://github.com/DanCreative/verapack/</projectUrl>
-        <licenseUrl>https://github.com/DanCreative/verapack/blob/main/LICENSE</licenseUrl>
+        <licenseUrl>https://github.com/DanCreative/verapack/blob/main/LICENSE.txt</licenseUrl>
         <projectSourceUrl>https://github.com/DanCreative/verapack/</projectSourceUrl>
         <bugTrackerUrl>https://github.com/DanCreative/verapack/issues</bugTrackerUrl>
         <tags>verapack unofficial veracode cli portable</tags>
