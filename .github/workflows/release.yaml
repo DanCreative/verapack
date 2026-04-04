@@ -5,6 +5,8 @@ on:
     tags:
       - "v*.*.*"
 
+  workflow_dispatch:
+      
 jobs:
   build-app:
     runs-on: ubuntu-latest
@@ -15,13 +17,15 @@ jobs:
     timeout-minutes: 2
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6.0.2
 
     - name: Set up Go
       id: go
-      uses: actions/setup-go@v4
+      uses: actions/setup-go@v6.4.0
       with:
-        go-version-file: go.mod
+        go-version-file: 'go.mod'   
+        cache: true
+        cache-dependency-path: 'go.sum'
 
     - name: Go Tidy
       run: go mod tidy && git diff --exit-code
@@ -42,45 +46,47 @@ jobs:
         zip -j out/verapack-${{ matrix.os }}-${{ matrix.arch }}-${{ github.ref_name }}.zip verapack.* .install/batch/install.cmd
 
     - name: Upload Artifacts
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7.0.0
       with:
         name: artefact-${{ matrix.os }}-${{ matrix.arch }}
         path: out/*.zip
         if-no-files-found: error
         overwrite: true       
-    
+
   deploy-to-chocolatey:
-    runs-on: windows-latest
-    needs: build-app    
-    if: ${{ vars.CHOCO_PUSH == 'true' }}
+    runs-on: ubuntu-latest
+    needs: build-app
+    if:  github.ref_type == 'tag' && vars.CHOCO_PUSH == 'true'
     steps:
-    - name: Download and install choco cli
-      shell: pwsh
-      run: |
-        Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
+      - id: sanitize-tag
+        shell: bash
+        run: echo "TAG=${TAG//v/}" >> "$GITHUB_OUTPUT"
+        env:
+          TAG: ${{ github.ref_name }}
 
-    - name: Download built artifacts
-      uses: actions/download-artifact@v5
-      with:
-        merge-multiple: true
-        path: out
+      - name: Download built artifacts
+        uses: actions/download-artifact@v8.0.1
+        with:
+          merge-multiple: true
+          path: out
 
-    - name: Create chocolatey package
-      shell: pwsh
-      run: |
-        choco pack --version "${{ github.ref_name }}".Replace("v","") --outputdirectory choco .\.install\choco\verapack.nuspec
-
-    - name: Push to Chocolatey community
-      shell: pwsh
-      run: |
-        choco push ".\choco\verapack.$('${{ github.ref_name }}'.Replace('v','')).nupkg" -key ${{ secrets.CHOCO_API_KEY }}
-
+      - name: Create chocolatey package
+        uses: DanCreative/ghaction-chocolatey@v1
+        with:
+          args: pack --version "${{ steps.sanitize-tag.outputs.TAG }}" --outputdirectory choco .\.install\choco\verapack.nuspec
+     
+      - name: Publish to Chocolatey community
+        uses: DanCreative/ghaction-chocolatey@v1
+        with:
+          args: push ".\choco\verapack.${{ steps.sanitize-tag.outputs.TAG }}.nupkg" -key ${{ secrets.CHOCO_API_KEY }} --source="https://push.chocolatey.org/"
+  
   release:
     runs-on: ubuntu-latest
+    if: github.ref_type == 'tag' && vars.RELEASE == 'true'
     needs: build-app
     steps:
     - name: Download built artifacts
-      uses: actions/download-artifact@v5
+      uses: actions/download-artifact@v8.0.1
       with:
         merge-multiple: true
         path: out
@@ -94,7 +100,6 @@ jobs:
           echo EOF
         } >> "$GITHUB_OUTPUT"
         
-
     # Documentation: https://github.com/softprops/action-gh-release
     - name: Create Github Release
       uses: softprops/action-gh-release@v2.3.2
