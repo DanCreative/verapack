@@ -1,5 +1,7 @@
 # Verapack
 
+![checks](https://github.com/DanCreative/verapack/actions/workflows/checks.yaml/badge.svg)
+
 Verapack is a utility that automates and simplifies running Veracode **SAST** & **SCA Upload** scans from your local machine.
 
 I built this tool to address a use case at a client where certain teams lacked a CI/CD pipeline for their applications, forcing them to run SAST scans manually. As a result, most of these teams had to run the scans for each of their multiple application once or more per month to remain within policy. This tedious and time-consuming process was prone to error, and if they missed an application, it could break their policy compliance streak. I found that this made Veracode and application security, in general, a negative experience for those teams. That's what I've tried to address with this tool.
