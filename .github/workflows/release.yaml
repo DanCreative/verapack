@@ -58,6 +58,8 @@ jobs:
     needs: build-app
     if:  github.ref_type == 'tag' && vars.CHOCO_PUSH == 'true'
     steps:
+      - uses: actions/checkout@v6.0.2
+      
       - id: sanitize-tag
         shell: bash
         run: echo "TAG=${TAG//v/}" >> "$GITHUB_OUTPUT"
