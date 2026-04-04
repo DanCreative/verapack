@@ -73,12 +73,12 @@ jobs:
       - name: Create chocolatey package
         uses: DanCreative/ghaction-chocolatey@v1
         with:
-          args: pack --version "${{ steps.sanitize-tag.outputs.TAG }}" --outputdirectory choco .\.install\choco\verapack.nuspec
+          args: pack --version "${{ steps.sanitize-tag.outputs.TAG }}" --outputdirectory choco ./.install/choco/verapack.nuspec
      
       - name: Publish to Chocolatey community
         uses: DanCreative/ghaction-chocolatey@v1
         with:
-          args: push ".\choco\verapack.${{ steps.sanitize-tag.outputs.TAG }}.nupkg" -key ${{ secrets.CHOCO_API_KEY }} --source="https://push.chocolatey.org/"
+          args: push "./choco/verapack.${{ steps.sanitize-tag.outputs.TAG }}.nupkg" -key ${{ secrets.CHOCO_API_KEY }} --source="https://push.chocolatey.org/"
   
   release:
     runs-on: ubuntu-latest
